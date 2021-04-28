@@ -64,4 +64,3 @@ GENOTYPES
 + genotypes will only be called if their posterior probability is greater than 0.75, otherwise it will be coded as missing data
 SNPS
 + snps are only called if they have a minor allele frequency above 0.05 [-minMaf 0.05] and a p-value below 0.10 [-SNP-pval 0.10]
-***I might want to enable another branching point here; maybe ask Wes if he has preferred limits***
