@@ -19,12 +19,14 @@ To recap, you want three things in this working directory {example file names, w
 This pipeline was developed on (largely) non-overlapping PE data, which means we treat it as SE data. This requires the PE files to be unzipped, concatenated, and deleted before gzipping the concatenated fq file. This can be accomplished with the python script "concat_fqs.py" (because this script globs every file ending with ".fq.gz" in the directory in which it is called, no input is needed). This script creates and submits a slurm script for each unique id (ABLG3_*_1.fq.gz and ABLG3_*_2.fq.gz have the uniqe id "ABLG3").
 
 STEP0-CONFIGURE
+
 The first step of the pipeline is to configure the SLURM space by loading modules, checking inputs, and indexing the reference genome (bwa-index).
 Begin by running 'lcWGSpipeline_step0-configure.py -c <config_filename>'
 This command takes one flag: '-c' or '--config_file'. This file must follow the format set out in lcWGS_config.txt; in fact, I recommend saving a copy of lcWGS_config.txt under some informative file name and editing it to reflect the pertinent information for your set-up.
 After this step has run, you will have a new checkpoint file named according to the preferred prefix you provided (exampleprefix.ckpt).
 
 STEP1-FASTQC
+
 The next step takes the checkpoint file created in the last step and runs every fastq file through fastQC. Because many people complete this step on an HPC, this is accomplished by generating and executing a SLURM submission script for every fastq file. 
 To run this step, call lcWGSpipeline_step1-fastqc.py -p <checkpoint_filename>'
 This step does not alter the checkpoint file at all. 
@@ -32,14 +34,17 @@ It is recommended that you download the fastQC .html files to your local machine
 This transfers fastQC files to the Desktop on your local machine.
 
 STEP2-BWA
+
 This step aligns reads to a reference genome, which was indexed in step 0. It adds the output .sam file names to the checkpoint file.
 It is run with the command 'lcWGSpipeline_step2-bwa.py -p <checkpoint_filename>'
 
 STEP3-SAMBAM
+
 The SAM step runs the aligned reads through SAMTOOLS: 'fixmate' cleans up the read pairings and flags from BWA; a pair of 'view' statements converts the .sam file to a .bam file and filters the .bam file for non-unique and poor quality mappings; and 'sort' sorts the read pairings by coordinate (instead of read name). After a .bam file is built, duplicate reads are removed and (if the data is PE) overlapping reads are clipped to generate the final .bam. This step concludes by generating a new file (<prefix>_bams_list.txt), which lists all final .bam files that will serve as input to ANGSD. The checkpoint file is updated with the the name of the file containing the list of .bams. 
 Run this step with 'lcWGSpipeline_step3-sambam.py -p <checkpoint_filename>'
 
 STEP4-GLS
+
 This is the heavy-lifting step, which filters the .bams according to user-specified flags and calculates genotype likelihoods before generating additional data types, specifically allele frequencies (a), genotypes (g), and snps (s). You may be interested in branching the pipeline at this step with the "-b" flag, specifying a file of branching parameterizations for filtering: 'lcWGSpipeline_step4-gls.py -p <checkpoint_filename> -b <branch_scheme_file> -t <data_output_types>'
 The branch schema file must include at least one line: <branch_name>[TAB]<arguments to pass>. I suggest you use lcWGS-step4_branching_schema.txt, saved under an informative file name. The three parameterizations in lcWGS-step4_branching_schema.txt serve as useful starting places (although, if you have PE data, add "-only_proper_pairs 1" to each line) and lines can be added as needed. lcWGSpipeline_step4-filterdata generates and submits ANGSD commands to the HPC, so any line in the branch schema file will be added like so (in the example below, see arguments found within []):
 If the branch schema file reads:
@@ -48,19 +53,24 @@ basic_filter_downsampled0.50	-uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -
 lcWGSpipeline_step4-filterdata will submit the following to the cluster:
 angsd -b <list_of_bamfiles_from_ckpt_file> -ref <reference_genome> -out <angsd_dir/[basic_filter]]> [-uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -trim 0 -C 50 -baq 1] -doCounts 1 -GL 2 -doGlf 4
 angsd -b <list_of_bamfiles_from_ckpt_file> -ref <reference_genome> -out <angsd_dir/[basic_filter_downsampled0.50]> [-uniqueOnly 1 -remove_bads 1 -only_proper_pairs 1 -trim 0 -c 50 -baq1 -downSample 0.50] -doCounts 1 -GL 1 -doGlf 1
-Some explanation of the flags added to the end (default bahviors)
+Some explanation of the flags added to the end (default behaviors)
 + genotype likelihoods (GLs) are calculated with the algorithm used in SAMtools [-GL 1] (NT recommends this when data uncertainty is high)
 + GLs are output as binary [-doGlf 1]
 Should you choose to try new parameterizations after running one, remove any lines in the branch schema file that have already run (this prevents repetitive runs and wasting computational resources).
+
 The checkpoint file is updated with a list of the genotype likelihood files (one for each branching scheme).
+
 After these have been calculated, the default behaviors currently implemented in this output step are detailed below (in future, I may revise this step [the associated flag is given]):
+
 ALLELE FREQUENCIES
 + major and minor alleles are fixed [-doMaf 1]
 + posterior probabilities are calculated using a uniform prior [-doPost 2] (instead of a prior informed by frequencies, 1)
 + both alleles are inferred from genotype likelihoods [-doMajorMinor 1]
+
 GENOTYPES
 + genotypes (GTs) are called as major/minor alleles [-doGeno 9] (GTs printed as major/minor (1) + calculate posterior probabilities of all genotypes (8))
 + posterior probabilities use a uniform prior [-doPost 2]
 + genotypes will only be called if their posterior probability is greater than 0.75, otherwise it will be coded as missing data
+
 SNPS
 + snps are only called if they have a minor allele frequency above 0.05 [-minMaf 0.05] and a p-value below 0.10 [-SNP-pval 0.10]
