@@ -36,7 +36,7 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 
 #Write an input file for the FASTQC job array
 fqc_array_input = scripts_dir + prefix + "-raw_fqcARRAY_input.txt"
-iterator = 0
+iterator = 1
 with open(fqc_array_input, 'w') as i:
 	for fqfile in fastqs_list:
 		i.write(str(iterator) + ":" + fqfile + "\n")
