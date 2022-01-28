@@ -168,8 +168,8 @@ bamslist_file = working_dir + prefix + "_bamslist.txt"
 with open(bamslist_file, 'w') as bams:
 	for sample in trimmed_fastqs.keys():
 		bams.write(bamtools_dir + prefix + "_" + sample + file_suffix + "\n")
-#with open(args.ckpt_file, 'a') as ckpt:
-#	ckpt.write("bamsLIST-all\t" + bamslist_file + "\n")
+with open(args.ckpt_file, 'a') as ckpt:
+	ckpt.write("bamsLIST-all\t" + bamslist_file + "\n")
 
 print("Step 3 has finished successfully! You will find two new scripts in ./scripts/: " + \
 	align_array_script + " and " + depth_array_script + ".")
