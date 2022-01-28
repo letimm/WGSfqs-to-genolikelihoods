@@ -147,7 +147,7 @@ with open(depth_array_script, 'w') as d:
 	d.write("#!/bin/bash\n\n")
 	d.write("#SBATCH --job-name=depth\n")
 	d.write("#SBATCH --cpus-per-task=5\n")
-	d.write("#SBATCH --output=depths_%A-%a.out" + "\n")
+	d.write("#SBATCH --output=" + jobsout_dir + prefix + "depths_%A-%a.out" + "\n")
 	d.write("#SBATCH --time=7-00:00:00\n")
 	d.write("#SBATCH --array=1-" + str(iterator) + "%32\n\n")
 	d.write("JOBS_FILE=" + depth_array_input + "\n")
@@ -160,8 +160,8 @@ with open(depth_array_script, 'w') as d:
 	d.write("\t\tbreak\n")
 	d.write("\tfi\n")
 	d.write("done\n\n")
-	d.write("touch " + prefix + "_depths.csv")
-	d.write("mean_cov_ind.py -i ${depth_file} -o " + prefix + "_depths.csv\n")
+	d.write("touch " + bamtools_dir + prefix + "_depths.csv\n")
+	d.write("mean_cov_ind.py -i ${depth_file} -o " + bamtools_dir + prefix + "_depths.csv\n")
 
 #Update checkpoint file with .bam filenames resulting from alignment
 bamslist_file = working_dir + prefix + "_bamslist.txt"
