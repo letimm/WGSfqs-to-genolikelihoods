@@ -147,7 +147,7 @@ with open(depth_array_script, 'w') as d:
 	d.write("#!/bin/bash\n\n")
 	d.write("#SBATCH --job-name=depth\n")
 	d.write("#SBATCH --cpus-per-task=5\n")
-	d.write("#SBATCH --output=" + jobsout_dir + prefix + "depths_%A-%a.out" + "\n")
+	d.write("#SBATCH --output=" + jobsout_dir + prefix + "_depths_%A-%a.out" + "\n")
 	d.write("#SBATCH --time=7-00:00:00\n")
 	d.write("#SBATCH --array=1-" + str(iterator) + "%32\n\n")
 	d.write("JOBS_FILE=" + depth_array_input + "\n")
