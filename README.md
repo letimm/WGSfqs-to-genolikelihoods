@@ -14,7 +14,7 @@ To recap, you want four things on the cluster {example file names, which will be
 3) the reference genome in fasta format (uncompressed),
 4) and the config file that details how the pipeline will run {lcWGS_config.txt}.
 
----DATA ASSEMBLY---
+# DATA ASSEMBLY
 STEP0-CONFIGURE
 command: lcWGSpipeline_step0-configure_vX.Y.py -c {lcWGS_config.txt}
 flag(s): -c or --config_file
@@ -55,7 +55,7 @@ output: {EXAMPLE_globalARRAY.sh} and {EXAMPLE_polymorphicARRAY.sh} (both of whic
 success message: "Step 4 has finished successfully! You will find two new scripts in ./scripts/: {EXAMPLE_globalARRAY.sh} calculates genotype likelihoods across all sites on each chromosome (separately). {EXAMPLE_polymorphicARRAY.sh} calculates genotype likelihoods across all polymorphic sites on each chromosome (separately). Both scripts can run simultaneously. After they have run, you will have genotype likelihoods (gls) and allele frequencies (maf) for all sites in the genome (global) and putatively variable sites (polymorphic). Congratulations! This represents the end of data assembly."
 results:
 
----DATA ANALYSIS---
+# DATA ANALYSIS
 PCA & ADMIXTURE - revise me!
 command: lcWGSpipeline_pca-admixture_vX.Y.py -p {EXAMPLE.ckpt} -k {10}
 flag(s): -p or --ckpt_file; -k or --k_val_max (default = 10)
