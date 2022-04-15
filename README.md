@@ -73,9 +73,9 @@ success message: "A new script has been generated to calculate population-level 
 results:  
 
 HMM  
-command: `lcWGSpipeline_hmm-bychrom_vX.Y.py -p {EXAMPLE.ckpt} -r {/home/ltimm/bin/HMM_log10FST+1_3norm.R}`  
+command: `lcWGSpipeline_hmm_vX.Y.py -p {EXAMPLE.ckpt} -r {/home/ltimm/bin/HMM_log10FST+1_3norm.R}`  
 flag(s): -p or --ckpt_file; -r or --r_script_loc (full path to the R script HMM_log10FST+1_3norm.R)  
-description: This step generates an array script which uses a Hidden Markov Model (HMM) to classify sites by fst value (high, low, background). This step runs by-chromosome over each population pair.  
+description: This step generates an array script which uses a Hidden Markov Model (HMM) to classify sites by fst value (high, low, background). This step runs over the whole genome for each population pair.  
 output: {EXAMPLE_hmmARRAY.sh} (which uses array input {EXAMPLE_hmmARRAY_input.txt}).  
 success message: "A new script has been generated to run HMM in R. Submitting {EXAMPLE_hmmARRAY.sh} will classify each site as high (1), low (2), or background differentiation (3), based on the fst value.  
 Note: for this step to run correctly, you must have HMM_log10FST+1_3norm.R available for the script to access (in your path)."  
