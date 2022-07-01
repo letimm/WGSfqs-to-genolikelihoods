@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import argparse
+import os
 from collections import OrderedDict
 import math
 
@@ -13,9 +14,7 @@ args = parser.parse_args()
 working_dir = None
 scripts_dir = None
 jobsout_dir = None
-fastqc_dir = None
 endedness = None
-trim_dir = None
 adapter_file = None
 prefix = None
 fastqs = OrderedDict()
@@ -32,18 +31,27 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			scripts_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "jobsoutDIR":
 			jobsout_dir = ckpt_setting[1]
-		elif ckpt_setting[0] == "fastqcDIR":
-			fastqc_dir = ckpt_setting[1] + "trimmed/"
 		elif ckpt_setting[0] == "ENDEDNESS":
 			endedness = ckpt_setting[1]
-		elif ckpt_setting[0] == "trimmedDIR":
-			trim_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "adapterFILE":
 			adapter_file = ckpt_setting[1]
 		elif ckpt_setting[0] == "prefix":
 			prefix = ckpt_setting[1]
 		elif ckpt_setting[0] == "FQ":
 			fastqs[ckpt_setting[1]] = ckpt_setting[2].split(" ")
+
+#Set up fastqc/trimmed directory
+fastqc_super_dir = working_dir + "fastqc/"
+fastqc_dir = fastqc_super_dir + "trimmed/"
+if os.path.isdir(fastqc_super_dir) is not True:
+	os.mkdir(fastqc_super_dir)
+if os.path.isdir(fastqc_dir) is not True:
+	os.mkdir(fastqc_dir)
+
+##Set up trimmed directory directory
+trim_dir = working_dir + "trimmed/"
+if os.path.isdir(trim_dir) is not True:
+	os.mkdir(trim_dir)
 
 #Write an input file for the alignment job array
 trim_array_input = scripts_dir + prefix + "_trimARRAY_input.txt"
@@ -126,7 +134,7 @@ with open(fq_array_script, 'w') as f:
 	f.write("#SBATCH --cpus-per-task=1\n")
 	f.write("#SBATCH --output=" + jobsout_dir + prefix + "-trim_fastqc_%A-%a.out" + "\n")
 	f.write("#SBATCH --time=3-00:00:00\n")
-	f.write("#SBATCH --array=1-" + str(iterator) + "%24\n\n")
+	f.write("#SBATCH --array=1-" + str(iterator - 1) + "%24\n\n")
 	f.write("module unload bio/fastqc/0.11.9\n")
 	f.write("module load bio/fastqc/0.11.9\n\n")
 	f.write("JOBS_FILE=" + fastqc_array_input + "\n")
@@ -152,6 +160,8 @@ with open(mQC_script, 'w') as ms:
 
 #Update checkpoint file with trimmed filenames resulting from alignment
 with open(args.ckpt_file, 'a') as ckpt:
+	ckpt.write("fastqc-trimDIR\t" + fastqc_dir + "\n")
+	ckpt.write("trimmedDIR\t" + trim_dir + "\n")
 	if endedness == "SE":
 		for fq_id in fastqs.keys():
 			ckpt.write("trimmedFQ\t" + fq_id + \
