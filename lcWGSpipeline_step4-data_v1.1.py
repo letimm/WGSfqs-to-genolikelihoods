@@ -18,7 +18,6 @@ working_dir = None
 scripts_dir = None
 jobsout_dir = None
 ref_genome = None
-gls_dir = None
 prefix = None
 chrs_list = []
 n_ind = None
@@ -40,8 +39,6 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			jobsout_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "refgenomeFASTA":
 			ref_genome = ckpt_setting[1]
-		elif ckpt_setting[0] == "glsDIR":
-			gls_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "prefix":
 			prefix = ckpt_setting[1]
 		elif ckpt_setting[0] == "chrsLIST":
@@ -53,12 +50,16 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 		elif ckpt_setting[0] == "bamsLIST-all":
 			full_bams_list = ckpt_setting[1]
 
+gls_dir = working_dir + "gls/"
+if os.path.isdir(gls_dir) is not True:
+	os.mkdir(gls_dir)
+
 #Global angsd for gls
 with open(args.blacklist_inds, 'r') as bb:
 	for bb_id in bb:
 		blacklist_bams.append(bb_id.rstrip())
 
-filtered_bamslist_filename = working_dir + "filtered_bamslist.txt"
+filtered_bamslist_filename = working_dir + prefix + "_filtered_bamslist.txt"
 with open(filtered_bamslist_filename, 'w') as fb:
 	with open(full_bams_list, 'r') as b:
 		for bam in b:
@@ -104,7 +105,7 @@ with open(global_script, 'w') as glb:
 	glb.write("angsd -b " + filtered_bamslist_filename + " " + \
 		"-ref " + ref_genome + " " + \
 		"-r ${contig}: " + \
-		"-out " + gls_dir + prefix + "-${contig}_global " + \
+		"-out " + gls_dir + prefix + "_${contig}_global " + \
 		"-nThreads 10 " + \
 		"-uniqueOnly 1 " + \
 		"-remove_bads 1 " + \
@@ -148,7 +149,7 @@ with open(polymorphic_script, 'w') as plm:
 	plm.write("angsd -b " + filtered_bamslist_filename + " " + \
 		"-ref " + ref_genome + " " + \
 		"-r ${contig}: " + \
-		"-out " + gls_dir + prefix + "-${contig}_polymorphic " + \
+		"-out " + gls_dir + prefix + "_${contig}_polymorphic " + \
 		"-nThreads 10 " + \
 		"-uniqueOnly 1 " + \
 		"-remove_bads 1 " + \
@@ -180,24 +181,25 @@ global_counts_files = []
 polymorphic_counts_files = []
 
 for chrom in chrs_list:
-	global_gls_file = gls_dir + prefix + "-" + chrom + "_global.beagle.gz"
+	global_gls_file = gls_dir + prefix + "_" + chrom + "_global.beagle.gz"
 	global_gls_files.append(global_gls_file)
-	polymorphic_gls_file = gls_dir + prefix + "-" + chrom + "_polymorphic.beagle.gz"
+	polymorphic_gls_file = gls_dir + prefix + "_" + chrom + "_polymorphic.beagle.gz"
 	polymorphic_gls_files.append(polymorphic_gls_file)
-	global_maf_file = gls_dir + prefix + "-" + chrom + "_global.mafs.gz"
+	global_maf_file = gls_dir + prefix + "_" + chrom + "_global.mafs.gz"
 	global_maf_files.append(global_maf_file)
-	polymorphic_maf_file = gls_dir + prefix + "-" + chrom + "_polymorphic.mafs.gz"
+	polymorphic_maf_file = gls_dir + prefix + "_" + chrom + "_polymorphic.mafs.gz"
 	polymorphic_maf_files.append(polymorphic_maf_file)
-	global_depths_file = gls_dir + prefix + "-" + chrom + "_global.pos.gz"
+	global_depths_file = gls_dir + prefix + "_" + chrom + "_global.pos.gz"
 	global_depths_files.append(global_depths_file)
-	polymorphic_depths_file = gls_dir + prefix + "-" + chrom + "_polymorphic.pos.gz"
+	polymorphic_depths_file = gls_dir + prefix + "_" + chrom + "_polymorphic.pos.gz"
 	polymorphic_depths_files.append(polymorphic_depths_file)
-	global_counts_file = gls_dir + prefix + "-" + chrom + "_global.counts.gz"
+	global_counts_file = gls_dir + prefix + "_" + chrom + "_global.counts.gz"
 	global_counts_files.append(global_counts_file)
-	polymorphic_counts_file = gls_dir + prefix + "-" + chrom + "_polymorphic.counts.gz"
+	polymorphic_counts_file = gls_dir + prefix + "_" + chrom + "_polymorphic.counts.gz"
 	polymorphic_counts_files.append(polymorphic_counts_file)
 
 with open(args.ckpt_file, 'a') as ckpt:
+	ckpt.write("glsDIR\t" + gls_dir + "\n")
 	ckpt.write("blackLIST\t" + args.blacklist_inds + "\n")
 	ckpt.write("nIND-filtered\t" + str(n_ind) + "\n")
 	ckpt.write("bamsLIST-filtered\t" + filtered_bamslist_filename + "\n")
@@ -210,8 +212,9 @@ with open(args.ckpt_file, 'a') as ckpt:
 	ckpt.write("countsFILES-global\t" + ",".join(global_counts_files) + "\n")
 	ckpt.write("countsFILES-polymorphic\t" + ",".join(polymorphic_counts_files) + "\n")
 
-print("Step 4 has finished successfully! You will find two new scripts in ./scripts/: " + \
-	global_script + " and " + polymorphic_script + ".")
+print("Step 4 has finished successfully! You will find two new scripts in ./scripts/:\n" + \
+	global_script + " calculates genotype likelihoods across all sites on each chromosome (separately).\n" + \
+	polymorphic_script + " calculates genotype likelihoods across all polymorphic sites on each chromosome (separately).\n")
 print("Both scripts can run simultaneously.")
 print("After they have run, you will have genotype likelihoods (gls) and allele frequencies (maf) for " + \
 	"all sites in the genome (global) and putatively variable sites (polymorphic).")
