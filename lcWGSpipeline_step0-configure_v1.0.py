@@ -109,19 +109,9 @@ if check_input_datafile(ref_genome) is not None:
 #Set up a directory structure for results to get printed to
 scripts_dir = my_working_dir + "scripts/"
 jobsout_dir = my_working_dir + "job_outfiles/"
-fastqc_dir = my_working_dir + "fastqc/"
-fastqc_raw_dir = fastqc_dir + "raw/"
-fastqc_trim_dir = fastqc_dir + "trimmed/"
-trim_dir = my_working_dir + "trimmed/"
 bwa_dir = my_working_dir + "bwa/"
-samtools_dir = my_working_dir + "samtools/"
-bamtools_dir = my_working_dir + "bamtools/"
-gls_dir = my_working_dir + "gls/"
-ld_dir = my_working_dir + "ld/"
-pca_dir = my_working_dir + "pca/"
-fst_dir = my_working_dir + "fst/"
 
-list_of_dirs = [scripts_dir, jobsout_dir, fastqc_dir, fastqc_raw_dir, fastqc_trim_dir, trim_dir, bwa_dir, samtools_dir, bamtools_dir, gls_dir, ld_dir, pca_dir, fst_dir]
+list_of_dirs = [scripts_dir, jobsout_dir, bwa_dir]
 for new_dir in list_of_dirs:
 	if os.path.isdir(new_dir) is not True:
 		os.mkdir(new_dir)
@@ -174,17 +164,9 @@ with open(run_prefix + ".ckpt", 'w') as ckpt_file:
 	ckpt_file.write("workingDIR\t" + my_working_dir + "\n")
 	ckpt_file.write("scriptsDIR\t" + scripts_dir + "\n")
 	ckpt_file.write("jobsoutDIR\t" + jobsout_dir + "\n")
-	ckpt_file.write("fastqcDIR\t" + fastqc_dir + "\n")
-	ckpt_file.write("trimmedDIR\t" + trim_dir + "\n")
 	ckpt_file.write("adapterFILE\t" + adapter_file + "\n")
 	ckpt_file.write("chrsLIST\t" + chrs + "\n")
 	ckpt_file.write("bwaDIR\t" + bwa_dir + "\n")
-	ckpt_file.write("samtoolsDIR\t" + samtools_dir + "\n")
-	ckpt_file.write("bamtoolsDIR\t" + bamtools_dir + "\n")
-	ckpt_file.write("glsDIR\t" + gls_dir + "\n")
-	ckpt_file.write("ldDIR\t" + ld_dir + "\n")
-	ckpt_file.write("pcaDIR\t" + pca_dir + "\n")
-	ckpt_file.write("fstDIR\t" + fst_dir + "\n")
 #capture the other odd bits
 	ckpt_file.write("prefix\t" + run_prefix + "\n")
 	ckpt_file.write("ENDEDNESS\t" + se_or_pe + "\n")
