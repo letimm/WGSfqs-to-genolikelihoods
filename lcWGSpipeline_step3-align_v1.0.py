@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import argparse
+import os
 from collections import OrderedDict
 import math
 
@@ -14,8 +15,6 @@ working_dir = None
 scripts_dir = None
 jobsout_dir = None
 bwa_dir = None
-samtools_dir = None
-bamtools_dir = None
 prefix = None
 refgenome_prefix = None
 trimmed_fastqs = OrderedDict()
@@ -35,10 +34,6 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			jobsout_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "bwaDIR":
 			bwa_dir = ckpt_setting[1]
-		elif ckpt_setting[0] == "samtoolsDIR":
-			samtools_dir = ckpt_setting[1]
-		elif ckpt_setting[0] == "bamtoolsDIR":
-			bamtools_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "prefix":
 			prefix = ckpt_setting[1]
 		elif ckpt_setting[0] == "ENDEDNESS":
@@ -47,6 +42,11 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			refgenome_prefix = ckpt_setting[1]
 		elif ckpt_setting[0] == "trimmedFQ":
 			trimmed_fastqs[ckpt_setting[1]] = ckpt_setting[2].split(" ")
+
+#Set up bamtools directory
+bamtools_dir = working_dir + "bamtools/"
+if os.path.isdir(bamtools_dir) is not True:
+	os.mkdir(bamtools_dir)
 
 #Write an input file for the alignment job array
 align_array_input = scripts_dir + prefix + "_alignARRAY_input.txt"
@@ -93,15 +93,15 @@ with open(align_array_script, 'w') as a:
 	if endedness == "SE":
 		a.write("bwa mem -M -t 10 " + bwa_dir + refgenome_prefix + " ${fq_r1} 2> " + \
 				bwa_dir + prefix + "_${sample_id}_bwa-mem.out > " + \
-				samtools_dir + prefix + "_${sample_id}.sam\n\n")
+				bamtools_dir + prefix + "_${sample_id}.sam\n\n")
 	elif endedness == "PE":
 		a.write("bwa mem -M -t 10 " + bwa_dir + refgenome_prefix + " ${fq_r1} ${fq_r2} 2> " + \
 				bwa_dir + prefix + "_${sample_id}_bwa-mem.out > " + \
-				samtools_dir + prefix + "_${sample_id}.sam\n\n")
+				bamtools_dir + prefix + "_${sample_id}.sam\n\n")
 
-	a.write("samtools view -bS -F 4 " + samtools_dir + prefix + "_${sample_id}.sam > " + \
+	a.write("samtools view -bS -F 4 " + bamtools_dir + prefix + "_${sample_id}.sam > " + \
 		bamtools_dir + prefix + "_${sample_id}.bam\n")
-	a.write("rm " + samtools_dir + prefix + "_${sample_id}.sam\n\n")
+	a.write("rm " + bamtools_dir + prefix + "_${sample_id}.sam\n\n")
 
 	if endedness == "SE":
 		a.write("samtools view -h -q 15 " + bamtools_dir + prefix + "_${sample_id}.bam" + \
@@ -123,15 +123,17 @@ with open(align_array_script, 'w') as a:
 	if endedness == "SE":
 		a.write("samtools depth -aa " + bamtools_dir + prefix + "_${sample_id}_sorted_dedup.bam" + \
 				" | cut -f 3 | gzip > " + bamtools_dir + prefix + "_${sample_id}.depth.gz")
-		file_suffix = "_minq15_sorted_dedup.bam"
+		file_suffix = "_sorted_dedup.bam"
 	elif endedness == "PE":
 		a.write("bam clipOverlap --in " + bamtools_dir + prefix + "_${sample_id}_sorted_dedup.bam" + \
 				" --out " + bamtools_dir + prefix + "_${sample_id}_sorted_dedup_clipped.bam --stats\n")
 		a.write("rm " + bamtools_dir + prefix + "_${sample_id}_sorted_dedup.bam\n\n")
 
 		a.write("samtools depth -aa " + bamtools_dir + prefix + "_${sample_id}_sorted_dedup_clipped.bam" + \
-				" | cut -f 3 | gzip > " + bamtools_dir + prefix + "_${sample_id}.depth.gz")
+				" | cut -f 3 | gzip > " + bamtools_dir + prefix + "_${sample_id}.depth.gz\n\n")
 		file_suffix = "_sorted_dedup_clipped.bam"
+
+	a.write("samtools index " + bamtools_dir + prefix + "_${sample_id}" + file_suffix)
 
 #Check depth with an array
 depth_array_input = scripts_dir + prefix + "_depthsARRAY_input.txt"
@@ -147,9 +149,9 @@ with open(depth_array_script, 'w') as d:
 	d.write("#!/bin/bash\n\n")
 	d.write("#SBATCH --job-name=depth\n")
 	d.write("#SBATCH --cpus-per-task=5\n")
-	d.write("#SBATCH --output=" + jobsout_dir + prefix + "_depths_%A-%a.out" + "\n")
+	d.write("#SBATCH --output=" + jobsout_dir + prefix + "depths_%A-%a.out" + "\n")
 	d.write("#SBATCH --time=7-00:00:00\n")
-	d.write("#SBATCH --array=1-" + str(iterator) + "%32\n\n")
+	d.write("#SBATCH --array=1-" + str(len(trimmed_fastqs.keys())) + "%32\n\n")
 	d.write("JOBS_FILE=" + depth_array_input + "\n")
 	d.write("IDS=$(cat ${JOBS_FILE})\n\n")
 	d.write("for sample_line in ${IDS}\n")
@@ -169,6 +171,7 @@ with open(bamslist_file, 'w') as bams:
 	for sample in trimmed_fastqs.keys():
 		bams.write(bamtools_dir + prefix + "_" + sample + file_suffix + "\n")
 with open(args.ckpt_file, 'a') as ckpt:
+	ckpt.write("bamtoolsDIR\t" + bamtools_dir + "\n")
 	ckpt.write("bamsLIST-all\t" + bamslist_file + "\n")
 
 print("Step 3 has finished successfully! You will find two new scripts in ./scripts/: " + \
