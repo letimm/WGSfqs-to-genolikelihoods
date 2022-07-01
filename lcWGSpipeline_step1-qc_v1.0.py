@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import argparse
+import os
 
 #Read in checkpoint file from step 0:
 parser = argparse.ArgumentParser()
@@ -8,9 +9,9 @@ parser.add_argument('--ckpt_file', '-p', help = 'Please provide the checkpoint f
 args = parser.parse_args()
 
 #Initialize run config variables with some default values
+working_dir = None
 scripts_dir = None
 jobsout_dir = None
-fastqc_dir = None
 prefix = None
 nind = None
 fastqs_list = []
@@ -20,12 +21,12 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 	for raw_ckpt_line in last_step_ckpt:
 		ckpt_line = raw_ckpt_line.rstrip()
 		ckpt_setting = ckpt_line.split('\t')
-		if ckpt_setting[0] == "scriptsDIR":
+		if ckpt_setting[0] == "workingDIR":
+			working_dir = ckpt_setting[1]
+		elif ckpt_setting[0] == "scriptsDIR":
 			scripts_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "jobsoutDIR":
 			jobsout_dir = ckpt_setting[1]
-		elif ckpt_setting[0] == "fastqcDIR":
-			fastqc_dir = ckpt_setting[1] + "raw/"
 		elif ckpt_setting[0] == "prefix":
 			prefix = ckpt_setting[1]
 		elif ckpt_setting[0] == "nIND":
@@ -33,6 +34,14 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 		elif ckpt_setting[0] == "FQ":
 			fq_files = ckpt_setting[2].split(" ")
 			fastqs_list.extend(fq_files)
+
+#Set up fastqc/raw directory
+fastqc_super_dir = working_dir + "fastqc/"
+fastqc_dir = fastqc_super_dir + "raw/"
+if os.path.isdir(fastqc_super_dir) is not True:
+	os.mkdir(fastqc_super_dir)
+if os.path.isdir(fastqc_dir) is not True:
+	os.mkdir(fastqc_dir)
 
 #Write an input file for the FASTQC job array
 fqc_array_input = scripts_dir + prefix + "-raw_fqcARRAY_input.txt"
@@ -50,7 +59,7 @@ with open(array_script, 'w') as a:
 	a.write("#SBATCH --cpus-per-task=1\n")
 	a.write("#SBATCH --output=" + jobsout_dir + prefix + "-raw_fastqc_%A-%a.out" + "\n")
 	a.write("#SBATCH --time=3-00:00:00\n")
-	a.write("#SBATCH --array=1-" + str(iterator) + "%24\n\n")
+	a.write("#SBATCH --array=1-" + str(iterator - 1) + "%24\n\n")
 	a.write("module unload bio/fastqc/0.11.9\n")
 	a.write("module load bio/fastqc/0.11.9\n\n")
 	a.write("JOBS_FILE=" + fqc_array_input + "\n")
@@ -73,6 +82,9 @@ with open(mQC_script, 'w') as ms:
 	ms.write("#SBATCH --output=" + jobsout_dir + prefix + "-raw_multiQC.out\n\n")
 	ms.write("source /home/ltimm/bin/hydraQC/bin/activate\n")
 	ms.write("multiqc " + fastqc_dir)
+
+with open(args.ckpt_file, 'a') as ckpt:
+	ckpt.write("fastqc-rawDIR\t" + fastqc_dir + "/n")
 
 print("Step 1 has finished successfully! You will find two new scripts in ./scripts/: " + \
 	array_script + " and " + mQC_script + ".")
