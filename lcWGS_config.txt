@@ -1,0 +1,12 @@
+# Remember to provide the full paths to files and directories.
+#The reference genome MUST be a fasta with the ".fa" file extension.
+#The working directory should contain the list of fastq files and the gzipped fastq files.
+# Don't worry about adding modules yourself. The pipeline will check for all needed modules and add them if they are not found.
+# If you run into trouble, please contact Laura.Timm@noaa.gov
+
+What file contains the list of FASTQs that will go into the analysis?   /home/ltimm/Sebastes_alutus/pop_fastqs.txt
+What file contains adapter sequences for TRIMMOMATIC?   /home/ltimm/NexteraPE-PE.fa
+What chromosomes/contigs are to be analyzed in this run?        CM025825.1,CM025826.1,CM025827.1,CM025828.1,CM025829.1,CM025830.1,CM025831.1,CM025832.1,CM025833.1,CM025834.1,CM025835.1,CM025836.1,CM025837.1,CM025838.1,CM025839.1,CM025840.1,
+What is the name of the FASTA file containing the reference genome?     /home/ltimm/ref_genomes/GCA_014673565.1_ASM1467356v1_genomic.fna
+What is the path to the working directory?      /home/ltimm/Sebastes_alutus/
+What prefix would you like associated with this run?    SALU-SSCH
