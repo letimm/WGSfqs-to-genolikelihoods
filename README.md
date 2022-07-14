@@ -81,14 +81,14 @@ To recap, you want four things on the cluster {example file names, which will be
 Note: for this step to run correctly, you must have HMM_log10FST+1_3norm.R available for the script to access (in your path)."  
 **results:**  
 
-### LOSTRUCT
-**command:** lcWGSpipeline_lostruct_vX.Y.py -p {EXAMPLE.ckpt} -w {100000} -n {3} -r {/home/ltimm/bin/<put-the-r-script-location-here}
-**flag(s):** -p or --ckpt_file; -w or --window_size' (the desired window size to run pcangsd over); -n or --num_pcs' (number of principal components to retain for each window); -r or --rscript_loc (full path to the R script that converts cov to eigenvalues; if you grab the R script from the same repo you found this, this refers to "cov_to_eigen.R")
-**description:** Because lostruct does not accept genotype likelihood data as input, this step takes each chromosome of GL data (the polymorphic beagle files associated with the project) and divides them into windows of user-specified length. PCAngsd runs over each window and passes the output to the cov_to_eigen.R script (from Nicolas Lou) along with the window size and the number of principal components to retain.
-**output:** {EXAMPLE_eigenARRAY.sh} (which uses array input {EXAMPLE_eigenARRAY_input.txt}).
-**success message:** I don't say anything helpful here yet...
-**results:** 
-**Note:** for this step to run correctly, you must have cov_to_eigen.R available for the script to access (in your path).
+### LOSTRUCT  
+**command:** `lcWGSpipeline_lostruct_vX.Y.py -p {EXAMPLE.ckpt} -w {100000} -n {3} -r {/home/ltimm/bin/<put-the-r-script-location-here}` 
+**flag(s):** -p or --ckpt_file; -w or --window_size (the desired window size to run pcangsd over); -n or --num_pcs (number of principal components to retain for each window); -r or --rscript_loc (full path to the R script that converts cov to eigenvalues; if you grab the R script from the same repo you found this, this refers to "cov_to_eigen.R")  
+**description:** Because lostruct does not accept genotype likelihood data as input, this step takes each chromosome of GL data (the polymorphic beagle files associated with the project) and divides them into windows of user-specified length. PCAngsd runs over each window and passes the output to the cov_to_eigen.R script (from Nicolas Lou) along with the window size and the number of principal components to retain. 
+**output:** {EXAMPLE_eigenARRAY.sh} (which uses array input {EXAMPLE_eigenARRAY_input.txt}).  
+**success message:** This is forthcoming...   
+**results:**  
+**Note:** for this step to run correctly, you must have cov_to_eigen.R available for the script to access (in your path). 
 
 ### ADAPTIVE REGIONS  
 **command:**  
