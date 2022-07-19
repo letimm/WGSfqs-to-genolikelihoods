@@ -6,7 +6,7 @@
 
 What file contains the list of FASTQs that will go into the analysis?   /home/ltimm/Sebastes_alutus/pop_fastqs.txt
 What file contains adapter sequences for TRIMMOMATIC?   /home/ltimm/NexteraPE-PE.fa
-What chromosomes/contigs are to be analyzed in this run?        CM025825.1,CM025826.1,CM025827.1,CM025828.1,CM025829.1,CM025830.1,CM025831.1,CM025832.1,CM025833.1,CM025834.1,CM025835.1,CM025836.1,CM025837.1,CM025838.1,CM025839.1,CM025840.1,
+What chromosomes/contigs are to be analyzed in this run?        /home/ltimm/Sebastes_alutus/chromosomes.txt
 What is the name of the FASTA file containing the reference genome?     /home/ltimm/ref_genomes/GCA_014673565.1_ASM1467356v1_genomic.fna
 What is the path to the working directory?      /home/ltimm/Sebastes_alutus/
 What prefix would you like associated with this run?    SALU-SSCH
