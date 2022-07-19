@@ -79,7 +79,7 @@ with open(args.config_file, 'r') as run_config:
 			elif "file contains adapter sequences for TRIMMOMATIC" in config_setting[0]:
 				raw_adapter_file = config_setting[1]
 			elif "chromosomes/contigs" in config_setting[0]:
-				chrs = config_setting[1]
+				raw_chrs_file = config_setting[1]
 			elif "FASTA file containing the reference genome" in config_setting[0]:
 				raw_ref_genome = config_setting[1]
 			elif "path to the working directory" in config_setting[0]:
@@ -91,6 +91,7 @@ with open(args.config_file, 'r') as run_config:
 my_working_dir = format_path(raw_working_dir, "directory")
 fastqs_listfile = format_path(raw_fastqs_listfile, "file")
 adapter_file = format_path(raw_adapter_file, "file")
+chrs_file = format_path(raw_chrs_file, "file")
 ref_genome = format_path(raw_ref_genome, "file")
 
 #Check the parsed info (files, etc) to be sure they are formatted correctly, etc. and throw helpful errors if they aren't.
@@ -102,6 +103,9 @@ if check_input_datafile(fastqs_listfile) is not None:
 if check_input_datafile(adapter_file) is not None:
 	print(check_input_datafile(adapter_file))
 	print("This file should specify the adapter sequences for TRIMMOMATIC.")
+if check_input_datafile(chrs_file) is not None:
+	print(check_input_datafile(chrs_file))
+	print("This file should specify the chromosomes/scaffolds to be included in the analysis.")
 if check_input_datafile(ref_genome) is not None:
 	print(check_input_datafile(ref_genome))
 	print("This file should specify the reference genome - uncompressed and in FASTA format.")
@@ -115,6 +119,13 @@ list_of_dirs = [scripts_dir, jobsout_dir, bwa_dir]
 for new_dir in list_of_dirs:
 	if os.path.isdir(new_dir) is not True:
 		os.mkdir(new_dir)
+
+#Format the chromosomes/scaffolds list for the ckpt file
+chrslist = []
+with open(chrs_file, 'r') as chromfile:
+	for raw_chrom_line in chromfile:
+		chrslist.append(raw_chrom_line.rstrip())
+chrs = ",".join(chrslist)
 
 #Get a handle on the targeted fastqs
 path_to_fastqs_as_list = fastqs_listfile.split("/")
