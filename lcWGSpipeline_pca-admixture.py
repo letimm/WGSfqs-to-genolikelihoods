@@ -15,9 +15,8 @@ args = parser.parse_args()
 working_dir = None
 scripts_dir = None
 jobsout_dir = None
-gls_dir = None
 prefix = None
-polymorphic_beagle_files = []
+email = None
 wgp_beagle = None
 
 #Parse the ckpt file
@@ -31,12 +30,14 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			scripts_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "jobsoutDIR":
 			jobsout_dir = ckpt_setting[1]
-		elif ckpt_setting[0] == "glsDIR":
-			gls_dir = ckpt_setting[1]
-		elif ckpt_setting[0] == "prefix":
-			prefix = ckpt_setting[1]
+		elif ckpt_setting[0] == "wholegenomeBEAGLE-polymorphic":
+			wgp_beagle = ckpt_setting[1]
 		elif ckpt_setting[0] == "glsFILES-polymorphic":
 			polymorphic_beagle_files = ckpt_setting[1].split(",")
+		elif ckpt_setting[0] == "prefix":
+			prefix = ckpt_setting[1]
+		elif ckpt_setting[0] == "email":
+			email = ckpt_setting[1]
 
 pca_dir = working_dir + "pca/"
 admix_dir = working_dir + "admixture/"
@@ -56,9 +57,11 @@ pcangsd_script = scripts_dir + prefix + "_pcangsdARRAY.sh"
 with open(pcangsd_script, 'w') as pca:
 	pca.write("#!/bin/bash\n\n")
 	pca.write("#SBATCH --cpus-per-task=10\n")
-	pca.write("#SBATCH --time=7-00:00:00\n")
+	pca.write("#SBATCH --time=0-05:00:00\n")
 	pca.write("#SBATCH --job-name=pca_" + prefix + "\n")
 	pca.write("#SBATCH --output=" + jobsout_dir + prefix + "_pcangsd_%A-%a.out\n")
+	pca.write("#SBATCH --mail-type=FAIL\n")
+	pca.write("#SBATCH --mail-user=" + email + "\n")
 	pca.write("#SBATCH --array=1-" + str(len(polymorphic_beagle_files)) + "%24\n\n")
 	pca.write("module unload bio/pcangsd/0.99\n")
 	pca.write("module load bio/pcangsd/0.99\n")
@@ -85,31 +88,14 @@ with open(pcangsd_script, 'w') as pca:
 		" -sites_save" + \
 		" -pcadapt")
 
-#Concatenate beagle files to make the gls file for the whole genome
-all_chrs_poly_beagle = gls_dir + prefix + "_wholegenome_polymorphic.beagle"
-beagle_concat_script = scripts_dir + prefix + "_concatenate_beagles.sh"
-with open(beagle_concat_script, 'w') as cs:
-	cs.write("#!/bin/bash\n\n")
-	cs.write("#SBATCH --cpus-per-task=10\n")
-	cs.write("#SBATCH --time=7-00:00:00\n")
-	cs.write("#SBATCH --job-name=" + prefix + "_concat-beagles\n")
-	cs.write("#SBATCH --output=" + jobsout_dir + prefix + "_concatenate-beagles_%A.out\n\n")
-	cs.write("zcat " + polymorphic_beagle_files[0] + " " + \
-		"| head -n 1 > " + \
-		all_chrs_poly_beagle + "; " + \
-		"for i in " + " ".join(polymorphic_beagle_files) + "; " + \
-		"do zcat $i " + \
-		"| tail -n +2 -q >> " + \
-		all_chrs_poly_beagle + "; " + \
-		"done\n")
-	cs.write("gzip " + all_chrs_poly_beagle)
-
 whole_genome_pca_script = scripts_dir + prefix + "_wholegenome_pcangsd.sh"
 with open(whole_genome_pca_script, 'w') as wgp:
 	wgp.write("#!/bin/bash\n\n")
 	wgp.write("#SBATCH --cpus-per-task=10\n")
-	wgp.write("#SBATCH --time=7-00:00:00\n")
-	wgp.write("#SBATCH --job-name=" + prefix + "_wgp-pca-admix\n")
+	wgp.write("#SBATCH --time=0-05:00:00\n")
+	wgp.write("#SBATCH --job-name=" + prefix + "_wgp-pca\n")
+	wgp.write("#SBATCH --mail-type=FAIL\n")
+	wgp.write("#SBATCH --mail-user=" + email + "\n")
 	wgp.write("#SBATCH --output=" + jobsout_dir + prefix + "_wholegenome_polymorphic_%A.out\n\n")
 	wgp.write("module unload bio/pcangsd/0.99\n")
 	wgp.write("module load bio/pcangsd/0.99\n")
@@ -117,7 +103,7 @@ with open(whole_genome_pca_script, 'w') as wgp:
 
 	wgp.write("pcangsd.py " + \
 		"-threads 10 " + \
-		"-beagle " + all_chrs_poly_beagle + ".gz " + \
+		"-beagle " + wgp_beagle + " " + \
 		"-o " + pca_dir + prefix + "_wholegenome-polymorphic " + \
 		"-sites_save " + \
 		"-pcadapt\n\n")
@@ -127,8 +113,10 @@ whole_genome_admix_script = scripts_dir + prefix + "_wholegenome_admixARRAY.sh"
 with open(whole_genome_admix_script, 'w') as wga:
 	wga.write("#!/bin/bash\n\n")
 	wga.write("#SBATCH --cpus-per-task=10\n")
-	wga.write("#SBATCH --time=7-00:00:00\n")
-	wga.write("#SBATCH --job-name=" + prefix + "_wgp-pca-admix\n")
+	wga.write("#SBATCH --time=0-20:00:00\n")
+	wga.write("#SBATCH --job-name=" + prefix + "_wgp-admix\n")
+	wga.write("#SBATCH --mail-type=FAIL\n")
+	wga.write("#SBATCH --mail-user=" + email + "\n")
 	wga.write("#SBATCH --output=" + jobsout_dir + prefix + "_wholegenome_polymorphic_%A-%a.out\n\n")
 	wga.write("#SBATCH --array=1-" + args.k_val_max + "%12\n\n")
 
@@ -143,19 +131,30 @@ with open(whole_genome_admix_script, 'w') as wga:
 	wga.write("done\n\n")
 
 	wga.write("NGSadmix " + \
-		"-likes " + all_chrs_poly_beagle + ".gz " + \
+		"-likes " + wgp_beagle + " " + \
 		"-K ${k_val} " + \
-		"-outfiles " + admix_dir + prefix + "_wholegenome-polymorphic_k${k_val} " + \
+		"-outfiles " + admix_dir + prefix + "_wholegenome-polymorphic_k${k_val}-0 " + \
 		"-P 10 " + \
-		"-minMaf 0")
+		"-minMaf 0\n")
+	wga.write("NGSadmix " + \
+		"-likes " + wgp_beagle + " " + \
+		"-K ${k_val} " + \
+		"-outfiles " + admix_dir + prefix + "_wholegenome-polymorphic_k${k_val}-1 " + \
+		"-P 10 " + \
+		"-minMaf 0\n")
+	wga.write("NGSadmix " + \
+		"-likes " + wgp_beagle + " " + \
+		"-K ${k_val} " + \
+		"-outfiles " + admix_dir + prefix + "_wholegenome-polymorphic_k${k_val}-2 " + \
+		"-P 10 " + \
+		"-minMaf 0\n")
 
 with open(args.ckpt_file, 'a') as ckpt:
-	ckpt.write("all-chrs_glsFILE-polymorphic\t" + all_chrs_poly_beagle + ".gz\n")
 	ckpt.write("pcaDIR\t" + pca_dir + "\n")
 	ckpt.write("admixtureDIR\t" + admix_dir + "\n")
 
-print("Four scripts have been generated: " + beagle_concat_script + ", " + pcangsd_script + ", " + whole_genome_pca_script + ", and " + whole_genome_admix_script + ".")
-print(beagle_concat_script + " must run before " + whole_genome_pca_script + " and " + whole_genome_admix_script + ".")
+print("Three scripts have been generated: " + pcangsd_script + ", " + whole_genome_pca_script + ", and " + whole_genome_admix_script + ".")
 print(pcangsd_script + " will run pca for each chromosome.")
 print(whole_genome_pca_script + " will run pca for the whole genome polymorphic data.")
-print(whole_genome_admix_script + " will launch an array of admixture jobs, testing every value of K between 1 and the max k value entered by the user.")
+print(whole_genome_admix_script + " will launch an array of admixture jobs, testing every value of K between 1 and the max k value entered by the user (three replicates will run for each K value).")
+print("All three scripts can run in parallel.")
