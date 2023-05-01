@@ -65,6 +65,7 @@ raw_fastqs_listfile = None
 raw_ref_genome = None
 raw_working_dir = "~/"
 run_prefix = "test"
+email = None
 adapter_file = None
 chrs = "chromosome-1"
 
@@ -86,6 +87,8 @@ with open(args.config_file, 'r') as run_config:
 				raw_working_dir = config_setting[1]
 			elif "prefix would you like associated with this run" in config_setting[0]:
 				run_prefix = config_setting[1]
+			elif "failed job notifications be sent" in config_setting[0]:
+				email = config_setting[1]
 
 #Standardize path formats
 my_working_dir = format_path(raw_working_dir, "directory")
@@ -153,6 +156,8 @@ with open(bwa_script, 'w') as s:
 	s.write("#!/bin/bash\n\n")
 	s.write("#SBATCH --cpus-per-task=1\n")
 	s.write("#SBATCH --job-name=bwa_index_" + refgenome_prefix + "\n")
+	s.write("#SBATCH --mail-type=FAIL\n")
+	s.write("#SBATCH --mail-user=" + email + "\n")
 	s.write("#SBATCH --output=" + jobsout_dir + "bwa-index_" + refgenome_prefix + ".out\n\n")
 	s.write("module unload aligners/bwa/0.7.17\n")
 	s.write("module load aligners/bwa/0.7.17\n\n")
@@ -164,6 +169,8 @@ if os.path.isfile(ref_genome_filename + ".fai") == False:
 		s.write("#!/bin/bash\n\n")
 		s.write("#SBATCH --cpus-per-task=1\n")
 		s.write("#SBATCH --job-name=fai_" + refgenome_prefix + "\n")
+		s.write("#SBATCH --mail-type=FAIL\n")
+		s.write("#SBATCH --mail-user=" + email + "\n")
 		s.write("#SBATCH --output=" + jobsout_dir + "fai_" + refgenome_prefix + ".out\n\n")
 		s.write("module unload bio/samtools/1.11\n")
 		s.write("module load bio/samtools/1.11\n\n")
@@ -181,6 +188,7 @@ with open(run_prefix + ".ckpt", 'w') as ckpt_file:
 #capture the other odd bits
 	ckpt_file.write("prefix\t" + run_prefix + "\n")
 	ckpt_file.write("ENDEDNESS\t" + se_or_pe + "\n")
+	ckpt_file.write("email\t" + email + "\n")
 #capture the files needed to move forward
 	ckpt_file.write("refgenomeFASTA\t" + ref_genome + "\n")
 	ckpt_file.write("refgenomeIND\t" + refgenome_prefix + "\n")
