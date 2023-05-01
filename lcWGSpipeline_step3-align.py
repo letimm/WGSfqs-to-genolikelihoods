@@ -16,6 +16,7 @@ scripts_dir = None
 jobsout_dir = None
 bwa_dir = None
 prefix = None
+email = None
 refgenome_prefix = None
 trimmed_fastqs = OrderedDict()
 endedness = None
@@ -36,6 +37,8 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			bwa_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "prefix":
 			prefix = ckpt_setting[1]
+		elif ckpt_setting[0] == "email":
+			email = ckpt_setting[1]
 		elif ckpt_setting[0] == "ENDEDNESS":
 			endedness = ckpt_setting[1]
 		elif ckpt_setting[0] == "refgenomeIND":
@@ -70,8 +73,10 @@ with open(align_array_script, 'w') as a:
 	a.write("#SBATCH --job-name=align\n")
 	a.write("#SBATCH --cpus-per-task=10\n")
 	a.write("#SBATCH --output=" + jobsout_dir + prefix + "_alignment_%A-%a.out" + "\n")
-	a.write("#SBATCH --time=7-00:00:00\n")
-	a.write("#SBATCH --array=1-" + str(len(trimmed_fastqs.keys())) + "%12\n\n")
+	a.write("#SBATCH --mail-type=FAIL\n")
+	a.write("#SBATCH --mail-user=" + email + "\n")
+	a.write("#SBATCH --time=3-00:00:00\n")
+	a.write("#SBATCH --array=1-" + str(len(trimmed_fastqs.keys())) + "%48\n\n")
 	a.write("module unload aligners/bwa/0.7.17 bio/samtools/1.11 bio/bamtools/2.5.1 bio/picard/2.23.9 bio/bamutil/1.0.5\n")
 	a.write("module load aligners/bwa/0.7.17 bio/samtools/1.11 bio/bamtools/2.5.1 bio/picard/2.23.9 bio/bamutil/1.0.5\n\n")
 	a.write("JOBS_FILE=" + align_array_input + "\n")
@@ -150,8 +155,10 @@ with open(depth_array_script, 'w') as d:
 	d.write("#SBATCH --job-name=depth\n")
 	d.write("#SBATCH --cpus-per-task=5\n")
 	d.write("#SBATCH --output=" + jobsout_dir + prefix + "depths_%A-%a.out" + "\n")
-	d.write("#SBATCH --time=7-00:00:00\n")
-	d.write("#SBATCH --array=1-" + str(len(trimmed_fastqs.keys())) + "%32\n\n")
+	d.write("#SBATCH --mail-type=FAIL\n")
+	d.write("#SBATCH --mail-user=" + email + "\n")
+	d.write("#SBATCH --time=0-12:00:00\n")
+	d.write("#SBATCH --array=1-" + str(len(trimmed_fastqs.keys())) + "%24\n\n")
 	d.write("JOBS_FILE=" + depth_array_input + "\n")
 	d.write("IDS=$(cat ${JOBS_FILE})\n\n")
 	d.write("for sample_line in ${IDS}\n")
@@ -184,4 +191,4 @@ print("If you identify samples with coverage that is 'too low', add the sample i
 	"referred to as the 'blacklist' of individuals to be excluded from genotype likelhiood calculations " +\
 	"and the final data sets.")
 print("After generating this blacklist, you can continue to step 4 to write scripts for generating the final data sets.")
-print("Remember to pass the checkpoint (.ckpt) file with the '-p' flag AND the blacklsit file with the '-b' flag.")
+print("Remember to pass the checkpoint (.ckpt) file with the '-p' flag AND the blacklist file with the '-b' flag.")
