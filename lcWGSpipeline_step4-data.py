@@ -19,6 +19,7 @@ scripts_dir = None
 jobsout_dir = None
 ref_genome = None
 prefix = None
+email = None
 chrs_list = []
 n_ind = None
 endedness = None
@@ -41,6 +42,8 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			ref_genome = ckpt_setting[1]
 		elif ckpt_setting[0] == "prefix":
 			prefix = ckpt_setting[1]
+		elif ckpt_setting[0] == "email":
+			email = ckpt_setting[1]
 		elif ckpt_setting[0] == "chrsLIST":
 			chrs_list = ckpt_setting[1].split(",")
 		elif ckpt_setting[0] == "nIND":
@@ -84,9 +87,11 @@ global_script = scripts_dir + prefix + "_globalARRAY.sh"
 with open(global_script, 'w') as glb:
 	glb.write("#!/bin/bash\n\n")
 	glb.write("#SBATCH --cpus-per-task=10\n")
-	glb.write("#SBATCH --time=7-00:00:00\n")
+	glb.write("#SBATCH --time=0-20:00:00\n")
 	glb.write("#SBATCH --job-name=global_" + prefix + "\n")
 	glb.write("#SBATCH --output=" + jobsout_dir + prefix + "_global_%A-%a.out\n")
+	glb.write("#SBATCH --mail-type=FAIL\n")
+	glb.write("#SBATCH --mail-user=" + email + "\n")
 	glb.write("#SBATCH --array=1-" + str(len(chrs_list)) + "%24\n\n")
 	glb.write("module unload bio/angsd/0.933\n")
 	glb.write("module load bio/angsd/0.933\n\n")
@@ -128,9 +133,11 @@ polymorphic_script = scripts_dir + prefix + "_polymorphicARRAY.sh"
 with open(polymorphic_script, 'w') as plm:
 	plm.write("#!/bin/bash\n\n")
 	plm.write("#SBATCH --cpus-per-task=10\n")
-	plm.write("#SBATCH --time=7-00:00:00\n")
+	plm.write("#SBATCH --time=0-20:00:00\n")
 	plm.write("#SBATCH --job-name=plm_" + prefix + "\n")
 	plm.write("#SBATCH --output=" + jobsout_dir + prefix + "_polymorphic_%A-%a.out\n")
+	plm.write("#SBATCH --mail-type=FAIL\n")
+	plm.write("#SBATCH --mail-user=" + email + "\n")
 	plm.write("#SBATCH --array=1-" + str(len(chrs_list)) + "%24\n\n")
 	plm.write("module unload bio/angsd/0.933\n")
 	plm.write("module load bio/angsd/0.933\n\n")
@@ -218,4 +225,3 @@ print("Step 4 has finished successfully! You will find two new scripts in ./scri
 print("Both scripts can run simultaneously.")
 print("After they have run, you will have genotype likelihoods (gls) and allele frequencies (maf) for " + \
 	"all sites in the genome (global) and putatively variable sites (polymorphic).")
-print("Congratulations! This represents the end of data assembly.")
