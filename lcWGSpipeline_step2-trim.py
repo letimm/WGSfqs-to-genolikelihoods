@@ -17,6 +17,7 @@ jobsout_dir = None
 endedness = None
 adapter_file = None
 prefix = None
+email = None
 fastqs = OrderedDict()
 trimmed_files = OrderedDict()
 
@@ -37,6 +38,8 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			adapter_file = ckpt_setting[1]
 		elif ckpt_setting[0] == "prefix":
 			prefix = ckpt_setting[1]
+		elif ckpt_setting[0] == "email":
+			email = ckpt_setting[1]
 		elif ckpt_setting[0] == "FQ":
 			fastqs[ckpt_setting[1]] = ckpt_setting[2].split(" ")
 
@@ -75,7 +78,9 @@ with open(trim_array_script, 'w') as t:
 	t.write("#SBATCH --job-name=trim\n")
 	t.write("#SBATCH --cpus-per-task=4\n")
 	t.write("#SBATCH --output=" + jobsout_dir + prefix + "_trimming_%A-%a.out" + "\n")
-	t.write("#SBATCH --time=7-00:00:00\n")
+	t.write("#SBATCH --mail-type=FAIL\n")
+	t.write("#SBATCH --mail-user=" + email + "\n")
+	t.write("#SBATCH --time=0-12:00:00\n")
 	t.write("#SBATCH --array=1-" + str(len(fastqs.keys())) + "%48\n\n")
 	t.write("module unload bio/trimmomatic/0.39\n")
 	t.write("module load bio/trimmomatic/0.39\n\n")
@@ -133,7 +138,9 @@ with open(fq_array_script, 'w') as f:
 	f.write("#SBATCH --job-name=fqc_array_" + prefix + "\n")
 	f.write("#SBATCH --cpus-per-task=1\n")
 	f.write("#SBATCH --output=" + jobsout_dir + prefix + "-trim_fastqc_%A-%a.out" + "\n")
-	f.write("#SBATCH --time=3-00:00:00\n")
+	f.write("#SBATCH --mail-type=FAIL\n")
+	f.write("#SBATCH --mail-user=" + email + "\n")
+	f.write("#SBATCH --time=0-03:00:00\n")
 	f.write("#SBATCH --array=1-" + str(iterator - 1) + "%24\n\n")
 	f.write("module unload bio/fastqc/0.11.9\n")
 	f.write("module load bio/fastqc/0.11.9\n\n")
@@ -154,6 +161,8 @@ with open(mQC_script, 'w') as ms:
 	ms.write("#!/bin/bash\n\n")
 	ms.write("#SBATCH --cpus-per-task=1\n")
 	ms.write("#SBATCH --job-name=multiQC\n")
+	ms.write("#SBATCH --mail-type=FAIL\n")
+	ms.write("#SBATCH --mail-user=" + email + "\n")
 	ms.write("#SBATCH --output=" + jobsout_dir + prefix + "-trim_multiQC.out\n\n")
 	ms.write("source /home/ltimm/bin/hydraQC/bin/activate\n")
 	ms.write("multiqc " + fastqc_dir)
