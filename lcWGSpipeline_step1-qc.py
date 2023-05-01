@@ -13,6 +13,7 @@ working_dir = None
 scripts_dir = None
 jobsout_dir = None
 prefix = None
+email = None
 nind = None
 fastqs_list = []
 
@@ -29,6 +30,8 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			jobsout_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "prefix":
 			prefix = ckpt_setting[1]
+		elif ckpt_setting[0] == "email":
+			email = ckpt_setting[1]
 		elif ckpt_setting[0] == "nIND":
 			nind = ckpt_setting[1]
 		elif ckpt_setting[0] == "FQ":
@@ -58,7 +61,9 @@ with open(array_script, 'w') as a:
 	a.write("#SBATCH --job-name=fqc_array_" + prefix + "\n")
 	a.write("#SBATCH --cpus-per-task=1\n")
 	a.write("#SBATCH --output=" + jobsout_dir + prefix + "-raw_fastqc_%A-%a.out" + "\n")
-	a.write("#SBATCH --time=3-00:00:00\n")
+	a.write("#SBATCH --mail-type=FAIL\n")
+	a.write("#SBATCH --mail-user=" + email + "\n")
+	a.write("#SBATCH --time=0-03:00:00\n")
 	a.write("#SBATCH --array=1-" + str(iterator - 1) + "%24\n\n")
 	a.write("module unload bio/fastqc/0.11.9\n")
 	a.write("module load bio/fastqc/0.11.9\n\n")
@@ -79,6 +84,8 @@ with open(mQC_script, 'w') as ms:
 	ms.write("#!/bin/bash\n\n")
 	ms.write("#SBATCH --cpus-per-task=1\n")
 	ms.write("#SBATCH --job-name=multiQC\n")
+	ms.write("#SBATCH --mail-type=FAIL\n")
+	ms.write("#SBATCH --mail-user=" + email + "\n")
 	ms.write("#SBATCH --output=" + jobsout_dir + prefix + "-raw_multiQC.out\n\n")
 	ms.write("source /home/ltimm/bin/hydraQC/bin/activate\n")
 	ms.write("multiqc " + fastqc_dir)
