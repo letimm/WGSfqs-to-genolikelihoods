@@ -8,6 +8,7 @@ import math
 #Read in config file for the run
 parser = argparse.ArgumentParser()
 parser.add_argument('--ckpt_file', '-p', help = 'Please provide the checkpoint file created in step 0.')
+parser.add_argument('--disable_fastp', action = 'store_true', help = 'Set this flag if you would like to skip fastp (the tool for removing polyG tails.')
 args = parser.parse_args()
 
 #Initialize run config variables with some default values
@@ -72,7 +73,7 @@ with open(trim_array_input, 'w') as i:
 
 #Write the trimmomatic job array script
 trim_array_script = scripts_dir + prefix + "_trimARRAY.sh"
-file_suffix = None
+file_processing_status = "trimmed"
 with open(trim_array_script, 'w') as t:
 	t.write("#!/bin/bash\n\n")
 	t.write("#SBATCH --job-name=trim\n")
@@ -82,8 +83,16 @@ with open(trim_array_script, 'w') as t:
 	t.write("#SBATCH --mail-user=" + email + "\n")
 	t.write("#SBATCH --time=0-12:00:00\n")
 	t.write("#SBATCH --array=1-" + str(len(fastqs.keys())) + "%48\n\n")
-	t.write("module unload bio/trimmomatic/0.39\n")
-	t.write("module load bio/trimmomatic/0.39\n\n")
+	t.write("module unload bio/trimmomatic/0.39")
+	if args.disable_fastp == False:
+		t.write(" bio/fastp/0.23.2\n")
+	else:
+		t.write("\n")
+	t.write("module load bio/trimmomatic/0.39")
+	if args.disable_fastp == False:
+		t.write(" bio/fastp/0.23.2\n")
+	else:
+		t.write("\n\n")
 	t.write("JOBS_FILE=" + trim_array_input + "\n")
 	t.write("IDS=$(cat ${JOBS_FILE})\n\n")
 	t.write("for sample_line in ${IDS}\n")
@@ -119,16 +128,31 @@ with open(trim_array_script, 'w') as t:
 			trim_dir + "${sample_id}_trimmed_R2_paired.fq.gz " + \
 			trim_dir + "${sample_id}_trimmed_R2_unpaired.fq.gz " + \
 			"ILLUMINACLIP:" + adapter_file + ":2:30:10:1:true MINLEN:40\n")
+	if args.disable_fastp == False:
+		#flags from Lou & Therkildsen
+		#L disables length filtering
+		#A disables adapter trimming
+		#cut_right performs a sliding window check for average quality (4bp window, qval of 20; default, like Nicolas uses),
+			#cutting the window and all sites to the right of the window when quality drops below the specified threshold
+		#h generates a report in html format (we could also do json)
+		file_processing_status = "trimmed_clipped"
+		t.write("fastp --trim_poly_g -L -A --cut_right " + \
+			"-i " + trim_dir + "${sample_id}_trimmed_R1_paired.fq.gz " + \
+			"-o " + trim_dir + "${sample_id}_trimmed_clipped_R1_paired.fq.gz ")
+		if endedness == "PE":
+			t.write("-I " + trim_dir + "${sample_id}_trimmed_R2_paired.fq.gz " + \
+				"-O " + trim_dir + "${sample_id}_trimmed_clipped_R2_paired.fq.gz ")
+		t.write("-h " + trim_dir + "${sample_id}_trimmed_clipped_paired_report.html")
 
 #Rerun FASTQC and MULTIQC now that TRIMMOMATIC has run
 fastqc_array_input = scripts_dir + prefix + "-trim_fqcARRAY_input.txt"
 iterator = 1
 with open(fastqc_array_input, 'w') as i:
 	for fastq in fastqs.keys():
-		i.write(str(iterator) + ":" + trim_dir + fastq + "_trimmed_R1_paired.fq.gz\n")
+		i.write(str(iterator) + ":" + trim_dir + fastq + "_" + file_processing_status + "_R1_paired.fq.gz\n")
 		iterator += 1
 		if endedness == "PE":
-			i.write(str(iterator) + ":" + trim_dir + fastq + "_trimmed_R2_paired.fq.gz\n")
+			i.write(str(iterator) + ":" + trim_dir + fastq + "_" + file_processing_status + "_R2_paired.fq.gz\n")
 			iterator += 1
 
 #Write the depth calculations job array script
@@ -174,12 +198,12 @@ with open(args.ckpt_file, 'a') as ckpt:
 	if endedness == "SE":
 		for fq_id in fastqs.keys():
 			ckpt.write("trimmedFQ\t" + fq_id + \
-				"\t" + trim_dir + fq_id + "_trimmed.fq.gz\n")
+				"\t" + trim_dir + fq_id + "_" + file_processing_status + ".fq.gz\n")
 	elif endedness == "PE":
 		for fq_id in fastqs.keys():
 			ckpt.write("trimmedFQ\t" + fq_id + \
-				"\t" + trim_dir + fq_id + "_trimmed_R1_paired.fq.gz " + \
-				trim_dir + fq_id + "_trimmed_R2_paired.fq.gz\n")
+				"\t" + trim_dir + fq_id + "_" + file_processing_status + "_R1_paired.fq.gz " + \
+				trim_dir + fq_id + "_" + file_processing_status + "_R2_paired.fq.gz\n")
 
 print("Step 2 has finished successfully! You will find three new scripts in ./scripts/: " + \
 	trim_array_script + ", " + fq_array_script + ", and " + mQC_script + ".")
