@@ -1,28 +1,32 @@
 #!/usr/bin/python3
-
 import argparse
+import math
 import os
 from collections import OrderedDict
-import math
+from math import sqrt
 
 #Read in config file for the run
 parser = argparse.ArgumentParser()
 parser.add_argument('--ckpt_file', '-p', help = 'Please provide the checkpoint file created in step 0.')
-parser.add_argument('--disable_fastp', action = 'store_true', help = 'Set this flag if you would like to skip fastp (the tool for removing polyG tails.')
+parser.add_argument('--blacklist_inds', '-b', help = 'Please provide a file listing any individuals that should be removed from downstream analyses.')
 args = parser.parse_args()
 
 #Initialize run config variables with some default values
 working_dir = None
 scripts_dir = None
 jobsout_dir = None
-endedness = None
-adapter_file = None
+ref_genome = None
 prefix = None
 email = None
-fastqs = OrderedDict()
-trimmed_files = OrderedDict()
+chrs_list = []
+n_ind = None
+endedness = None
+blacklist_bams = []
+full_bams_list = None
+gls_filename = None
+q = "15"
 
-#Parse the config file to determine what's needed (if user wants bwa, no need for picard or bowtie2)
+#Parse the config file to determine what's needed
 with open(args.ckpt_file, 'r') as last_step_ckpt:
 	for raw_ckpt_line in last_step_ckpt:
 		ckpt_line = raw_ckpt_line.rstrip()
@@ -33,182 +37,172 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			scripts_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "jobsoutDIR":
 			jobsout_dir = ckpt_setting[1]
-		elif ckpt_setting[0] == "ENDEDNESS":
-			endedness = ckpt_setting[1]
-		elif ckpt_setting[0] == "adapterFILE":
-			adapter_file = ckpt_setting[1]
+		elif ckpt_setting[0] == "refgenomeFASTA":
+			ref_genome = ckpt_setting[1]
 		elif ckpt_setting[0] == "prefix":
 			prefix = ckpt_setting[1]
 		elif ckpt_setting[0] == "email":
 			email = ckpt_setting[1]
-		elif ckpt_setting[0] == "FQ":
-			fastqs[ckpt_setting[1]] = ckpt_setting[2].split(" ")
+		elif ckpt_setting[0] == "chrsLIST":
+			chrs_list = ckpt_setting[1].split(",")
+		elif ckpt_setting[0] == "nIND":
+			n_ind = int(ckpt_setting[1])
+		elif ckpt_setting[0] == "ENDEDNESS":
+			endedness = ckpt_setting[1]
+		elif ckpt_setting[0] == "bamsLIST-all":
+			full_bams_list = ckpt_setting[1]
+		elif ckpt_setting[0] == "qFILTER":
+			q = str(ckpt_setting[1])
 
-#Set up fastqc/trimmed directory
-fastqc_super_dir = working_dir + "fastqc/"
-fastqc_dir = fastqc_super_dir + "trimmed/"
-if os.path.isdir(fastqc_super_dir) is not True:
-	os.mkdir(fastqc_super_dir)
-if os.path.isdir(fastqc_dir) is not True:
-	os.mkdir(fastqc_dir)
+gls_dir = working_dir + "gls/"
+if os.path.isdir(gls_dir) is not True:
+	os.mkdir(gls_dir)
 
-##Set up trimmed directory directory
-trim_dir = working_dir + "trimmed/"
-if os.path.isdir(trim_dir) is not True:
-	os.mkdir(trim_dir)
+#Global angsd for gls
+with open(args.blacklist_inds, 'r') as bb:
+	for bb_id in bb:
+		blacklist_bams.append(bb_id.rstrip())
 
-#Write an input file for the alignment job array
-trim_array_input = scripts_dir + prefix + "_trimARRAY_input.txt"
-with open(trim_array_input, 'w') as i:
-	if endedness == "SE":
-		iterator = 1
-		for se_fastq in fastqs.values():
-			i.write(str(iterator) + ":" + se_fastq + "\n")
-			iterator += 1
-	elif endedness == "PE":
-		iterator = 1
-		for pe_fastqs in fastqs.values():
-			i.write(str(iterator) + ":" + ":".join(pe_fastqs) + "\n")
-			iterator += 1
+filtered_bamslist_filename = working_dir + prefix + "_filtered_bamslist.txt"
+with open(filtered_bamslist_filename, 'w') as fb:
+	with open(full_bams_list, 'r') as b:
+		for bam in b:
+			blacklisted_status = False
+			for black_bam in blacklist_bams:
+				black_id = black_bam + "_"
+				if black_id in bam:
+					blacklisted_status = True
+					n_ind -= 1
+					break
+			if blacklisted_status == False:
+				fb.write(bam)
 
-#Write the trimmomatic job array script
-trim_array_script = scripts_dir + prefix + "_trimARRAY.sh"
-file_processing_status = "trimmed"
-with open(trim_array_script, 'w') as t:
-	t.write("#!/bin/bash\n\n")
-	t.write("#SBATCH --job-name=trim\n")
-	t.write("#SBATCH --cpus-per-task=4\n")
-	t.write("#SBATCH --output=" + jobsout_dir + prefix + "_trimming_%A-%a.out" + "\n")
-	t.write("#SBATCH --mail-type=FAIL\n")
-	t.write("#SBATCH --mail-user=" + email + "\n")
-	t.write("#SBATCH --time=0-12:00:00\n")
-	t.write("#SBATCH --array=1-" + str(len(fastqs.keys())) + "%48\n\n")
-	t.write("module unload bio/trimmomatic/0.39")
-	if args.disable_fastp == False:
-		t.write(" bio/fastp/0.23.2\n")
-	else:
-		t.write("\n")
-	t.write("module load bio/trimmomatic/0.39")
-	if args.disable_fastp == False:
-		t.write(" bio/fastp/0.23.2\n")
-	else:
-		t.write("\n\n")
-	t.write("JOBS_FILE=" + trim_array_input + "\n")
-	t.write("IDS=$(cat ${JOBS_FILE})\n\n")
-	t.write("for sample_line in ${IDS}\n")
-	t.write("do\n")
-	t.write("""\tjob_index=$(echo ${sample_line} | awk -F ":" '{print $1}')\n""")
-	t.write("""\tfq_r1=$(echo ${sample_line} | awk -F ":" '{print $2}')\n""")
-	if endedness == "PE":
-		t.write("""\tfq_r2=$(echo ${sample_line} | awk -F ":" '{print $3}')\n""")
-	t.write("\tif [[ ${SLURM_ARRAY_TASK_ID} == ${job_index} ]]; then\n")
-	t.write("\t\tbreak\n")
-	t.write("\tfi\n")
-	t.write("done\n\n")
-
-	t.write("sample_id=$(echo $fq_r1 | sed 's!^.*/!!')\n")
-	t.write("sample_id=${sample_id%%_*}\n\n")
-	if endedness == "SE":
-		t.write("java -jar ${TRIMMOMATIC} " + \
-			"SE " + \
-			"-threads 4 " + \
-			"-phred33 " + \
-			"${fq_r1} " + \
-			trim_dir + "${sample_id}_trimmed.fq.gz " + \
-			"ILLUMINACLIP:" + adapter_file + ":2:30:10 MINLEN:40\n")
-	elif endedness == "PE":
-		t.write("java -jar ${TRIMMOMATIC} " + \
-			"PE " + \
-			"-threads 4 " + \
-			"-phred33 " + \
-			"${fq_r1} " + \
-			"${fq_r2} " + \
-			trim_dir + "${sample_id}_trimmed_R1_paired.fq.gz " + \
-			trim_dir + "${sample_id}_trimmed_R1_unpaired.fq.gz " + \
-			trim_dir + "${sample_id}_trimmed_R2_paired.fq.gz " + \
-			trim_dir + "${sample_id}_trimmed_R2_unpaired.fq.gz " + \
-			"ILLUMINACLIP:" + adapter_file + ":2:30:10:1:true MINLEN:40\n")
-	if args.disable_fastp == False:
-		#flags from Lou & Therkildsen
-		#L disables length filtering
-		#A disables adapter trimming
-		#cut_right performs a sliding window check for average quality (4bp window, qval of 20; default, like Nicolas uses),
-			#cutting the window and all sites to the right of the window when quality drops below the specified threshold
-		#h generates a report in html format (we could also do json)
-		file_processing_status = "trimmed_clipped"
-		t.write("fastp --trim_poly_g -L -A --cut_right " + \
-			"-i " + trim_dir + "${sample_id}_trimmed_R1_paired.fq.gz " + \
-			"-o " + trim_dir + "${sample_id}_trimmed_clipped_R1_paired.fq.gz ")
-		if endedness == "PE":
-			t.write("-I " + trim_dir + "${sample_id}_trimmed_R2_paired.fq.gz " + \
-				"-O " + trim_dir + "${sample_id}_trimmed_clipped_R2_paired.fq.gz ")
-		t.write("-h " + trim_dir + "${sample_id}_trimmed_clipped_paired_report.html")
-
-#Rerun FASTQC and MULTIQC now that TRIMMOMATIC has run
-fastqc_array_input = scripts_dir + prefix + "-trim_fqcARRAY_input.txt"
-iterator = 1
-with open(fastqc_array_input, 'w') as i:
-	for fastq in fastqs.keys():
-		i.write(str(iterator) + ":" + trim_dir + fastq + "_" + file_processing_status + "_R1_paired.fq.gz\n")
+angsd_array_input = scripts_dir + prefix + "_angsdARRAY_input.txt"
+with open(angsd_array_input, 'w') as i:
+	iterator = 1
+	for contig in chrs_list:
+		i.write(str(iterator) + ":" + contig + "\n")
 		iterator += 1
-		if endedness == "PE":
-			i.write(str(iterator) + ":" + trim_dir + fastq + "_" + file_processing_status + "_R2_paired.fq.gz\n")
-			iterator += 1
 
-#Write the depth calculations job array script
-fq_array_script = scripts_dir + prefix + "-trim_fastqcARRAY.sh"
-with open(fq_array_script, 'w') as f:
-	f.write("#!/bin/bash\n\n")
-	f.write("#SBATCH --job-name=fqc_array_" + prefix + "\n")
-	f.write("#SBATCH --cpus-per-task=1\n")
-	f.write("#SBATCH --output=" + jobsout_dir + prefix + "-trim_fastqc_%A-%a.out" + "\n")
-	f.write("#SBATCH --mail-type=FAIL\n")
-	f.write("#SBATCH --mail-user=" + email + "\n")
-	f.write("#SBATCH --time=0-03:00:00\n")
-	f.write("#SBATCH --array=1-" + str(iterator - 1) + "%24\n\n")
-	f.write("module unload bio/fastqc/0.11.9\n")
-	f.write("module load bio/fastqc/0.11.9\n\n")
-	f.write("JOBS_FILE=" + fastqc_array_input + "\n")
-	f.write("IDS=$(cat ${JOBS_FILE})\n\n")
-	f.write("for sample_line in ${IDS}\n")
-	f.write("do\n")
-	f.write("""\tjob_index=$(echo ${sample_line} | awk -F ":" '{print $1}')\n""")
-	f.write("""\tfq=$(echo ${sample_line} | awk -F ":" '{print $2}')\n""")
-	f.write("\tif [[ ${SLURM_ARRAY_TASK_ID} == ${job_index} ]]; then\n")
-	f.write("\t\tbreak\n")
-	f.write("\tfi\n")
-	f.write("done\n\n")
-	f.write("fastqc ${fq} -o " + fastqc_dir)
+global_script = scripts_dir + prefix + "_globalARRAY.sh"
+with open(global_script, 'w') as glb:
+	glb.write("#!/bin/bash\n\n")
+	glb.write("#SBATCH --cpus-per-task=10\n")
+	glb.write("#SBATCH --time=0-20:00:00\n")
+	glb.write("#SBATCH --job-name=global_" + prefix + "\n")
+	glb.write("#SBATCH --output=" + jobsout_dir + prefix + "_global_%A-%a.out\n")
+	glb.write("#SBATCH --mail-type=FAIL\n")
+	glb.write("#SBATCH --mail-user=" + email + "\n")
+	glb.write("#SBATCH --array=1-" + str(len(chrs_list)) + "%24\n\n")
+	glb.write("module unload bio/angsd/0.933\n")
+	glb.write("module load bio/angsd/0.933\n\n")
 
-mQC_script = scripts_dir + prefix + "-trim_multiqcSLURM.sh"
-with open(mQC_script, 'w') as ms:
-	ms.write("#!/bin/bash\n\n")
-	ms.write("#SBATCH --cpus-per-task=1\n")
-	ms.write("#SBATCH --job-name=multiQC\n")
-	ms.write("#SBATCH --mail-type=FAIL\n")
-	ms.write("#SBATCH --mail-user=" + email + "\n")
-	ms.write("#SBATCH --output=" + jobsout_dir + prefix + "-trim_multiQC.out\n\n")
-	ms.write("source /home/ltimm/bin/hydraQC/bin/activate\n")
-	ms.write("multiqc " + fastqc_dir)
+	glb.write("JOBS_FILE=" + angsd_array_input + "\n")
+	glb.write("IDS=$(cat ${JOBS_FILE})\n\n")
+	glb.write("for sample_line in ${IDS}\n")
+	glb.write("do\n")
+	glb.write("""\tjob_index=$(echo ${sample_line} | awk -F ":" '{print $1}')\n""")
+	glb.write("""\tcontig=$(echo ${sample_line} | awk -F ":" '{print $2}')\n""")
+	glb.write("\tif [[ ${SLURM_ARRAY_TASK_ID} == ${job_index} ]]; then\n")
+	glb.write("\t\tbreak\n")
+	glb.write("\tfi\n")
+	glb.write("done\n\n")
 
-#Update checkpoint file with trimmed filenames resulting from alignment
+	glb.write("angsd -b " + filtered_bamslist_filename + " " + \
+		"-ref " + ref_genome + " " + \
+		"-r ${contig}: " + \
+		"-out " + gls_dir + prefix + "_${contig}_global " + \
+		"-nThreads 10 " + \
+		"-uniqueOnly 1 " + \
+		"-remove_bads 1 " + \
+		"-trim 0 " + \
+		"-C 50 " + \
+		"-minMapQ " + q + " " + \
+		"-minQ " + q + " " + \
+		"-doCounts 1 " + \
+		"-setminDepth " + str(n_ind) + " " + \
+		"-setmaxDepth " + str(float(n_ind) * 5) + " " + \
+		"-GL 1 " + \
+		"-doGlf 2 " + \
+		"-doMaf 1 " + \
+		"-doMajorMinor 1 " + \
+		"-doDepth 1 " + \
+		"-dumpCounts 3")
+	if endedness == "PE":
+		glb.write(" -only_proper_pairs 1")
+
+polymorphic_script = scripts_dir + prefix + "_polymorphicARRAY.sh"
+with open(polymorphic_script, 'w') as plm:
+	plm.write("#!/bin/bash\n\n")
+	plm.write("#SBATCH --cpus-per-task=10\n")
+	plm.write("#SBATCH --time=0-20:00:00\n")
+	plm.write("#SBATCH --job-name=plm_" + prefix + "\n")
+	plm.write("#SBATCH --output=" + jobsout_dir + prefix + "_polymorphic_%A-%a.out\n")
+	plm.write("#SBATCH --mail-type=FAIL\n")
+	plm.write("#SBATCH --mail-user=" + email + "\n")
+	plm.write("#SBATCH --array=1-" + str(len(chrs_list)) + "%24\n\n")
+	plm.write("module unload bio/angsd/0.933\n")
+	plm.write("module load bio/angsd/0.933\n\n")
+
+	plm.write("JOBS_FILE=" + angsd_array_input + "\n")
+	plm.write("IDS=$(cat ${JOBS_FILE})\n\n")
+	plm.write("for sample_line in ${IDS}\n")
+	plm.write("do\n")
+	plm.write("""\tjob_index=$(echo ${sample_line} | awk -F ":" '{print $1}')\n""")
+	plm.write("""\tcontig=$(echo ${sample_line} | awk -F ":" '{print $2}')\n""")
+	plm.write("\tif [[ ${SLURM_ARRAY_TASK_ID} == ${job_index} ]]; then\n")
+	plm.write("\t\tbreak\n")
+	plm.write("\tfi\n")
+	plm.write("done\n\n")
+
+	plm.write("angsd -b " + filtered_bamslist_filename + " " + \
+		"-ref " + ref_genome + " " + \
+		"-r ${contig}: " + \
+		"-out " + gls_dir + prefix + "_${contig}_polymorphic " + \
+		"-nThreads 10 " + \
+		"-uniqueOnly 1 " + \
+		"-remove_bads 1 " + \
+		"-trim 0 " + \
+		"-C 50 " + \
+		"-minMapQ " + q + " " + \
+		"-minQ " + q + " " + \
+		"-doCounts 1 " + \
+		"-setminDepth " + str(n_ind) + " " + \
+		"-setmaxDepth " + str(float(n_ind) * 5) + " " + \
+		"-doGlf 2 " + \
+		"-GL 1 " + \
+		"-doMaf 1 " + \
+		"-doMajorMinor 1 " + \
+		"-minMaf 0.05 " + \
+		"-SNP_pval 1e-10 " + \
+		"-doDepth 1 " + \
+		"-dumpCounts 3")
+	if endedness == "PE":
+		plm.write(" -only_proper_pairs 1")
+
+#Update checkpoint file with the data file names
+polymorphic_gls_files = []
+polymorphic_maf_files = []
+polymorphic_depths_files = []
+polymorphic_counts_files = []
+
+for chrom in chrs_list:
+	polymorphic_gls_file = gls_dir + prefix + "_" + chrom + "_polymorphic.beagle.gz"
+	polymorphic_gls_files.append(polymorphic_gls_file)
+	polymorphic_maf_file = gls_dir + prefix + "_" + chrom + "_polymorphic.mafs.gz"
+	polymorphic_maf_files.append(polymorphic_maf_file)
+
 with open(args.ckpt_file, 'a') as ckpt:
-	ckpt.write("fastqc-trimDIR\t" + fastqc_dir + "\n")
-	ckpt.write("trimmedDIR\t" + trim_dir + "\n")
-	if endedness == "SE":
-		for fq_id in fastqs.keys():
-			ckpt.write("trimmedFQ\t" + fq_id + \
-				"\t" + trim_dir + fq_id + "_" + file_processing_status + ".fq.gz\n")
-	elif endedness == "PE":
-		for fq_id in fastqs.keys():
-			ckpt.write("trimmedFQ\t" + fq_id + \
-				"\t" + trim_dir + fq_id + "_" + file_processing_status + "_R1_paired.fq.gz " + \
-				trim_dir + fq_id + "_" + file_processing_status + "_R2_paired.fq.gz\n")
+	ckpt.write("glsDIR\t" + gls_dir + "\n")
+	ckpt.write("blackLIST\t" + args.blacklist_inds + "\n")
+	ckpt.write("nIND-filtered\t" + str(n_ind) + "\n")
+	ckpt.write("bamsLIST-filtered\t" + filtered_bamslist_filename + "\n")
+	ckpt.write("glsFILES-polymorphic\t" + ",".join(polymorphic_gls_files) + "\n")
+	ckpt.write("mafsFILES-polymorphic\t" + ",".join(polymorphic_maf_files) + "\n")
 
-print("Step 2 has finished successfully! You will find three new scripts in ./scripts/: " + \
-	trim_array_script + ", " + fq_array_script + ", and " + mQC_script + ".")
-print("Each script must run in the above order and each job must finish before submitting the next.")
-print("While there is no need to wait before running step 3 to generate the alignment script, " + \
-	"it is probably wise to wait until the multiQC script has completed and the results have been viewed " + \
-	"in a web browser prior to submitting the script written by step 3.")
-print("Remember to pass the checkpoint (.ckpt) file with the '-p' flag.")
+print("Step 4 has finished successfully! You will find two new scripts in ./scripts/:\n" + \
+	global_script + " calculates genotype likelihoods across all sites on each chromosome (separately).\n" + \
+	polymorphic_script + " calculates genotype likelihoods across all polymorphic sites on each chromosome (separately).\n")
+print("Both scripts can run simultaneously.")
+print("After they have run, you will have genotype likelihoods (gls) and allele frequencies (maf) for " + \
+	"all sites in the genome (global) and putatively variable sites (polymorphic).")
