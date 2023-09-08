@@ -1,0 +1,36 @@
+DATA EXPLORATION CONFIG FILE
+#A general note: 
+	#number of minQ_vals * number of minMapQ_vals * (1 or 2 if check_transitions is "no" or "yes", respectively) = number of scripts written
+#working_directory specifies where scripts, results, and jobout files will be written
+#reference_genome requires the full path to the reference genome fasta (uncompressed); 
+	#samtools faidx will have run over this genome in step0 of the lcWGSpipeline, 
+	#but if data_exploration is run outside of the pipeline, 
+	#samtools faidx must be run manually (it's very fast).
+	#If the user has access to an ancestral genome, specify the path to it with this setting.
+#data_exploration_prefix is the prefix for the run; this is optional - if no prefix is given, the script will default to "de".
+	#The prefix does not need to recapitulate the details of the run - filenames will reflect parameter settings.
+#endedness takes "SE" for single-end and "PE" for paired-end
+#foldedness takes "folded" (if the ancestral genome is the reference genome, which is the usual case) or 
+	#"unfolded" (if an ancestral genome is provided to ref_genome).
+#both minQ_vals and minMapQ_vals can take as many comma-separated values as the user chooses to pass, from 1-?. 
+	#However, if >4 scripts will be written (generating >5 datasets of heterozygosity), the script will ask for confirmaiton before continuing.
+#both min_depth and max_depth take a single value
+#check_transitions can be set to 
+	#"yes", which will run -noTrans 0 (allow transitions) and -noTrans 1 (disallow transitions); or 
+	#"no", which will always allow transitions.
+#bamslist_file is the file providing a list of bamfiles to use for data exploration
+	#(complete paths must be provided to the bamslist_file and within the file to every bamfile)
+#email takes the email address to which failed jobs alerts should be sent
+
+working_directory	/scratch/ltimm/data_exploration_test/
+reference_genome	/home/ltimm/ref_genomes/vermilion-kolora.chr_only.fasta
+data_exploration_prefix	DEtest
+endedness	PE
+foldedness	folded
+minQ_vals	20,33
+minMapQ_vals	20
+min_depth	2
+max_depth	10
+check_transitions	yes
+bamslist_file	/home/ltimm/Sebastes_ruberrimus/SRUB-SMIN_de-test_bamslist.txt
+email	laura.timm@noaa.gov
