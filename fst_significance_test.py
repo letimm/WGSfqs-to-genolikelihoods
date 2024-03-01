@@ -29,9 +29,9 @@ pair_dist = OrderedDict() #[pair_label] = [fst_distribution]
 
 #set whether to record weighted or unweighted fst
 result_index = None
-if args.weighted:
+if args.unweighted:
 	result_index = 0
-elif args.unweighted:
+elif args.weighted:
 	result_index = 1
 
 #parse fst files
