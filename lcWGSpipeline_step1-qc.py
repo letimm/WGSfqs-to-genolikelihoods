@@ -61,6 +61,7 @@ with open(array_script, 'w') as a:
 	a.write("#SBATCH --job-name=fqc_array_" + prefix + "\n")
 	a.write("#SBATCH --cpus-per-task=1\n")
 	a.write("#SBATCH --output=" + jobsout_dir + prefix + "-raw_fastqc_%A-%a.out" + "\n")
+	a.write("#SBATCH --error=" + jobsout_dir + prefix + "-raw_fastqc_%A-%a.err" + "\n")
 	a.write("#SBATCH --mail-type=FAIL\n")
 	a.write("#SBATCH --mail-user=" + email + "\n")
 	a.write("#SBATCH --time=0-03:00:00\n")
@@ -86,12 +87,14 @@ with open(mQC_script, 'w') as ms:
 	ms.write("#SBATCH --job-name=multiQC\n")
 	ms.write("#SBATCH --mail-type=FAIL\n")
 	ms.write("#SBATCH --mail-user=" + email + "\n")
-	ms.write("#SBATCH --output=" + jobsout_dir + prefix + "-raw_multiQC.out\n\n")
-	ms.write("source /home/ltimm/bin/hydraQC/bin/activate\n")
+	ms.write("#SBATCH --output=" + jobsout_dir + prefix + "-raw_multiQC.out\n")
+	ms.write("#SBATCH --error=" + jobsout_dir + prefix + "-raw_multiQC.err\n")
+	
+	ms.write("mamba activate multiqc-1.17\n")
 	ms.write("multiqc " + fastqc_dir)
 
 with open(args.ckpt_file, 'a') as ckpt:
-	ckpt.write("fastqc-rawDIR\t" + fastqc_dir + "/n")
+	ckpt.write("fastqc-rawDIR\t" + fastqc_dir + "\n")
 
 print("Step 1 has finished successfully! You will find two new scripts in ./scripts/: " + \
 	array_script + " and " + mQC_script + ".")
