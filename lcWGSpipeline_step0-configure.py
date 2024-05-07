@@ -26,33 +26,33 @@ def format_path(raw_path, path_type):
 
 def check_wd(wd):
 	try:
-		assert os.path.isdir(wd)
-	except ValueError:
-		return "Path error: " + wd + " is not a valid path. Please provide the path to the directory in which you'd like the results and log files to be saved"
+		assert os.path.isdir(wd), "Path error: " + wd + " is not a valid path. Please provide the path to the directory in which you'd like the results and log files to be saved"
+	except AssertionError as path_msg:
+		quit(path_msg) #YOURE HERE
 
 def check_input_datafile(user_specified_file):
 	try:
-		assert os.path.isfile(user_specified_file)
-	except ValueError:
-		return "The user-specified file, " + user_specified_file + " does not exist."
+		assert os.path.isfile(user_specified_file), "The user-specified file, " + user_specified_file + " does not exist."
+	except AssertionError as file_msg:
+		quit(file_msg)
 
 def check_fq_readfiles(SEorPE_fastq_files):
 	try:
-		assert len(SEorPE_fastq_files) < 3
-	except ValueError:
-		return "FASTQs reads error: there are two many files associated with each sample. At most, there should be two files associated with a sample. This may be an issue with parsing the fastq filename: please be sure the raw fastq filenames follow the format <sampleID_R1.fq.gz> or <sampleID_R1.fq> (if not gzipped)."
+		assert len(SEorPE_fastq_files) < 3, "FASTQs reads error: there are two many files associated with each sample. At most, there should be two files associated with a sample. This may be an issue with parsing the fastq filename: please be sure the raw fastq filenames follow the format <sampleID_R1.fq.gz> or <sampleID_R1.fq> (if not gzipped)."
+	except AssertionError as endedness_msg:
+		quit(endedness_msg)
 
 def check_fq_filenames(putative_fastq_files):
 	for putative_fq in putative_fastq_files:
 		try:
-			assert os.path.isfile(putative_fq)
-		except ValueError:
-			return "FASTQ existential error: the fastq file " + putative_fq + " does not appear to exist."
+			assert os.path.isfile(putative_fq), "FASTQ existential error: the fastq file " + putative_fq + " does not appear to exist."
+		except AssertionError as fq_exist_msg:
+			quit(fq_exist_msg)
 		fq_name_list = putative_fq.split(".")
 		try:
-			assert fq_name_list[-1] == "fq" or fq_name_list[-2] == "fq" or fq_name_list[-1] == "fastq" or fq_name_list[-2] == "fastq"
-		except ValueError:
-			return "FASTQ filename error: the fastq file " + putative_fq + " does not include any of the typical fastq file suffixes (fastq or fq). Please ensure all fastq filenames follow the format <sampleID_R1.fq.gz> or <sampleID_R1.fq> (if not gzipped)."
+			assert fq_name_list[-1] == "fq" or fq_name_list[-2] == "fq" or fq_name_list[-1] == "fastq" or fq_name_list[-2] == "fastq", "FASTQ filename error: the fastq file " + putative_fq + " does not include any of the typical fastq file suffixes (fastq or fq). Please ensure all fastq filenames follow the format <sampleID_R1.fq.gz> or <sampleID_R1.fq> (if not gzipped)."
+		except AssertionError as fq_filename_msg:
+			quit(fq_filename_msg)
 
 #Read in config file for the run
 parser = argparse.ArgumentParser()
@@ -86,7 +86,7 @@ with open(args.config_file, 'r') as run_config:
 			elif "path to the working directory" in config_setting[0]:
 				raw_working_dir = config_setting[1]
 			elif "prefix would you like associated with this run" in config_setting[0]:
-				run_prefix = config_setting[1]
+				run_prefix = config_setting[1].replace("_", "-")
 			elif "failed job notifications be sent" in config_setting[0]:
 				email = config_setting[1]
 
@@ -158,7 +158,8 @@ with open(bwa_script, 'w') as s:
 	s.write("#SBATCH --job-name=bwa_index_" + refgenome_prefix + "\n")
 	s.write("#SBATCH --mail-type=FAIL\n")
 	s.write("#SBATCH --mail-user=" + email + "\n")
-	s.write("#SBATCH --output=" + jobsout_dir + "bwa-index_" + refgenome_prefix + ".out\n\n")
+	s.write("#SBATCH --output=" + jobsout_dir + "bwa-index_" + refgenome_prefix + ".out\n")
+	s.write("#SBATCH --error=" + jobsout_dir + "bwa-index_" + refgenome_prefix + ".err\n\n")
 	s.write("module unload aligners/bwa/0.7.17\n")
 	s.write("module load aligners/bwa/0.7.17\n\n")
 	s.write("bwa index -p " + bwa_dir + refgenome_prefix + " " + ref_genome + "\n")
@@ -171,7 +172,8 @@ if os.path.isfile(ref_genome_filename + ".fai") == False:
 		s.write("#SBATCH --job-name=fai_" + refgenome_prefix + "\n")
 		s.write("#SBATCH --mail-type=FAIL\n")
 		s.write("#SBATCH --mail-user=" + email + "\n")
-		s.write("#SBATCH --output=" + jobsout_dir + "fai_" + refgenome_prefix + ".out\n\n")
+		s.write("#SBATCH --output=" + jobsout_dir + "fai_" + refgenome_prefix + ".out\n")
+		s.write("#SBATCH --error=" + jobsout_dir + "fai_" + refgenome_prefix + ".err\n")
 		s.write("module unload bio/samtools/1.11\n")
 		s.write("module load bio/samtools/1.11\n\n")
 		s.write("samtools faidx " + ref_genome + "\n")
