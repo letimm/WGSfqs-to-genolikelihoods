@@ -27,7 +27,7 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			jobsout_dir = ckpt_setting[1]
 		elif ckpt_setting[0] == "glsDIR":
 			gls_dir = ckpt_setting[1]
-		elif ckpt_setting[0] == "prefix":
+		elif ckpt_setting[0] == "usePREFIX":
 			prefix = ckpt_setting[1]
 		elif ckpt_setting[0] == "email":
 			email = ckpt_setting[1]
@@ -45,7 +45,8 @@ with open(beagle_concat_script, 'w') as bcs:
 	bcs.write("#SBATCH --job-name=" + prefix + "_concat-beagles\n")
 	bcs.write("#SBATCH --mail-type=FAIL\n")
 	bcs.write("#SBATCH --mail-user=" + email + "\n")
-	bcs.write("#SBATCH --output=" + jobsout_dir + prefix + "_concatenate-beagles_%A.out\n\n")
+	bcs.write("#SBATCH --output=" + jobsout_dir + prefix + "_concatenate-beagles_%A.out\n")
+	bcs.write("#SBATCH --error=" + jobsout_dir + prefix + "_concatenate-beagles_%A.err\n\n")
 	bcs.write("zcat " + polymorphic_beagle_files[0] + " " + \
 		"| head -n 1 > " + \
 		all_chrs_polymorphic_beagle + "; " + \
@@ -66,7 +67,8 @@ with open(mafs_concat_script, 'w') as mcs:
 	mcs.write("#SBATCH --job-name=" + prefix + "_concat-mafs\n")
 	mcs.write("#SBATCH --mail-type=FAIL\n")
 	mcs.write("#SBATCH --mail-user=" + email + "\n")
-	mcs.write("#SBATCH --output=" + jobsout_dir + prefix + "_concatenate-mafs_%A.out\n\n")
+	mcs.write("#SBATCH --output=" + jobsout_dir + prefix + "_concatenate-mafs_%A.out\n")
+	mcs.write("#SBATCH --error=" + jobsout_dir + prefix + "_concatenate-mafs_%A.err\n\n")
 	mcs.write("module unload bio/angsd/0.933\n")
 	mcs.write("module load bio/angsd/0.933\n\n")
 	mcs.write("for i in " + " ".join(polymorphic_maf_files) + "\n" + \
