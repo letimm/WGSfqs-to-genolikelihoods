@@ -34,7 +34,7 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			wgp_beagle = ckpt_setting[1]
 		elif ckpt_setting[0] == "glsFILES-polymorphic":
 			polymorphic_beagle_files = ckpt_setting[1].split(",")
-		elif ckpt_setting[0] == "prefix":
+		elif ckpt_setting[0] == "usePREFIX":
 			prefix = ckpt_setting[1]
 		elif ckpt_setting[0] == "email":
 			email = ckpt_setting[1]
@@ -60,6 +60,7 @@ with open(pcangsd_script, 'w') as pca:
 	pca.write("#SBATCH --time=0-05:00:00\n")
 	pca.write("#SBATCH --job-name=pca_" + prefix + "\n")
 	pca.write("#SBATCH --output=" + jobsout_dir + prefix + "_pcangsd_%A-%a.out\n")
+	pca.write("#SBATCH --error=" + jobsout_dir + prefix + "_pcangsd_%A-%a.err\n")
 	pca.write("#SBATCH --mail-type=FAIL\n")
 	pca.write("#SBATCH --mail-user=" + email + "\n")
 	pca.write("#SBATCH --array=1-" + str(len(polymorphic_beagle_files)) + "%24\n\n")
@@ -97,6 +98,7 @@ with open(whole_genome_pca_script, 'w') as wgp:
 	wgp.write("#SBATCH --mail-type=FAIL\n")
 	wgp.write("#SBATCH --mail-user=" + email + "\n")
 	wgp.write("#SBATCH --output=" + jobsout_dir + prefix + "_wholegenome_polymorphic_%A.out\n\n")
+	wgp.write("#SBATCH --error=" + jobsout_dir + prefix + "_wholegenome_polymorphic_%A.err\n\n")
 	wgp.write("module unload bio/pcangsd/0.99\n")
 	wgp.write("module load bio/pcangsd/0.99\n")
 	wgp.write("source /opt/bioinformatics/venv/pcangsd-0.99/bin/activate\n\n")
@@ -117,7 +119,8 @@ with open(whole_genome_admix_script, 'w') as wga:
 	wga.write("#SBATCH --job-name=" + prefix + "_wgp-admix\n")
 	wga.write("#SBATCH --mail-type=FAIL\n")
 	wga.write("#SBATCH --mail-user=" + email + "\n")
-	wga.write("#SBATCH --output=" + jobsout_dir + prefix + "_wholegenome_polymorphic_%A-%a.out\n\n")
+	wga.write("#SBATCH --output=" + jobsout_dir + prefix + "_wholegenome_polymorphic_%A-%a.out\n")
+	wga.write("#SBATCH --error=" + jobsout_dir + prefix + "_wholegenome_polymorphic_%A-%a.err\n\n")
 	wga.write("#SBATCH --array=1-" + args.k_val_max + "%12\n\n")
 
 	wga.write("module unload bio/ngsadmix\n")
