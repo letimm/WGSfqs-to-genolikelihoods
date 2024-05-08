@@ -12,7 +12,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--ckpt_file', '-p', help = 'Please provide the checkpoint file created in step 0.')
 parser.add_argument('--blacklist_inds', '-b', help = 'Please provide a file listing any individuals that should be removed from downstream analyses.')
 parser.add_argument('--prefix_extension', '-x', help = 'Option to add to the prefix to distinguish between parameterizations', required = False)
-parser.add_argument('--region_generating_script', '-s', help = 'Provide the location of fasta_generate_regions.py transferred from the freebayes github.')
 parser.add_argument('--region_size', '-r', help = 'Option to specify region size', default = "100000")
 parser.add_argument('--ncores', '-n', help = 'Option to specify number of cores over which to parallelize', default = "20")
 args = parser.parse_args()
@@ -93,10 +92,10 @@ with open(freebayes_parallel_script, 'w') as fbp:
 	fbp.write("#SBATCH --mail-type=FAIL\n")
 	fbp.write("#SBATCH --mail-user=" + email + "\n\n")
 
-	fbp.write("mamba activate freebayes-1.3.7\n\n")
+	fbp.write("mamba activate freebayes-1.3.6\n\n")
 
 	fbp.write("freebayes-parallel <(" + \
-		args.region_generating_script + " " + \
+		"fasta_generate_regions.py " + \
 		ref_genome + ".fai " + \
 		args.region_size + ") " + \
 		args.ncores + " " +
