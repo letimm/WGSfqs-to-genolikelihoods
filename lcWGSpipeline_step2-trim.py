@@ -19,6 +19,7 @@ endedness = None
 adapter_file = None
 prefix = None
 email = None
+multiqc_env = None
 fastqs = OrderedDict()
 trimmed_files = OrderedDict()
 
@@ -41,6 +42,8 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			prefix = ckpt_setting[1]
 		elif ckpt_setting[0] == "email":
 			email = ckpt_setting[1]
+		elif ckpt_setting[0] == "multiqcENV":
+			multiqc_env = ckpt_setting[1]
 		elif ckpt_setting[0] == "FQ":
 			fastqs[ckpt_setting[1]] = ckpt_setting[2].split(" ")
 
@@ -193,7 +196,7 @@ with open(mQC_script, 'w') as ms:
 	ms.write("#SBATCH --output=" + jobsout_dir + prefix + "-trim_multiQC.out\n\n")
 	ms.write("#SBATCH --error=" + jobsout_dir + prefix + "-trim_multiQC.err\n\n")
 
-	ms.write("mamba activate multiqc-1.17\n")
+	ms.write("source " + multiqc_env + "/bin/activate\n")
 	ms.write("multiqc " + fastqc_dir)
 
 #Update checkpoint file with trimmed filenames resulting from alignment
