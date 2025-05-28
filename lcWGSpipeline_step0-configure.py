@@ -28,7 +28,7 @@ def check_wd(wd):
 	try:
 		assert os.path.isdir(wd), "Path error: " + wd + " is not a valid path. Please provide the path to the directory in which you'd like the results and log files to be saved"
 	except AssertionError as path_msg:
-		quit(path_msg) #YOURE HERE
+		quit(path_msg)
 
 def check_input_datafile(user_specified_file):
 	try:
