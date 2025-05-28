@@ -9,7 +9,7 @@ from math import sqrt
 #Read in config file for the run
 parser = argparse.ArgumentParser()
 parser.add_argument('--ckpt_file', '-p', help = 'Please provide the checkpoint file created in step 0.')
-parser.add_argument('--blacklist_inds', '-b', help = 'Please provide a file listing any individuals that should be removed from downstream analyses.')
+parser.add_argument('--exclude_inds', '-e', help = 'Please provide a file listing any individuals that should be removed from downstream analyses.')
 parser.add_argument('--global_gls', action = 'store_true', help = 'Set this flag if you would like to calculate genotype likelihoods for all sites across the genome (if this flag is not set, gls will only be calculated for SNPs).')
 parser.add_argument('--quality_val', '-q', default = '15', help = 'Please provide a value for minQ and minMapQ. Default = 15')
 parser.add_argument('--minInd', '-i', help = 'You can use this flag to specify a minInd parameter.', required = False)
@@ -29,7 +29,7 @@ email = None
 chrs_list = []
 n_ind = None
 endedness = None
-blacklist_bams = []
+exclude_bams = []
 full_bams_list = None
 gls_filename = None
 
@@ -58,32 +58,37 @@ with open(args.ckpt_file, 'r') as last_step_ckpt:
 			endedness = ckpt_setting[1]
 		elif ckpt_setting[0] == "bamsLIST-all":
 			full_bams_list = ckpt_setting[1]
+		elif ckpt_setting[0] == "downsampled_bamsLIST-all":  #it's important that this is AFTER "bamsLIST-all"
+			full_bams_list = ckpt_setting[1]
 		elif ckpt_setting[0] == "qFILTER":
 			q = str(ckpt_setting[1])
 
+#make directory for gls results
 gls_dir = working_dir + "gls/"
 if os.path.isdir(gls_dir) is not True:
 	os.mkdir(gls_dir)
 
-#Global angsd for gls
-with open(args.blacklist_inds, 'r') as bb:
+#record which bamfiles to exclude
+with open(args.exclude_inds, 'r') as bb:
 	for bb_id in bb:
-		blacklist_bams.append(bb_id.rstrip())
+		exclude_bams.append(bb_id.rstrip())
 
+#make a new bamslist file, with excluded individuals removed
 filtered_bamslist_filename = working_dir + prefix + "_filtered_bamslist.txt"
 with open(filtered_bamslist_filename, 'w') as fb:
 	with open(full_bams_list, 'r') as b:
 		for bam in b:
-			blacklisted_status = False
-			for black_bam in blacklist_bams:
+			excluded_status = False
+			for black_bam in exclude_bams:
 				black_id = black_bam + "_"
 				if black_id in bam:
-					blacklisted_status = True
+					excluded_status = True
 					n_ind -= 1
 					break
-			if blacklisted_status == False:
+			if excluded_status == False:
 				fb.write(bam)
 
+#make array input file (a job for each chromosome)
 angsd_array_input = scripts_dir + prefix + "_angsdARRAY_input.txt"
 with open(angsd_array_input, 'w') as i:
 	iterator = 1
@@ -91,6 +96,7 @@ with open(angsd_array_input, 'w') as i:
 		i.write(str(iterator) + ":" + contig + "\n")
 		iterator += 1
 
+#extend the prefix, if applicable
 extended_prefix = prefix
 writeout_ckpt_filename = args.ckpt_file
 if args.prefix_extension is not None:
@@ -98,12 +104,13 @@ if args.prefix_extension is not None:
 	writeout_ckpt_filename = extended_prefix + ".ckpt"
 	shutil.copy2(args.ckpt_file, writeout_ckpt_filename)
 
+#angsd array script - polymorphic
 polymorphic_script = scripts_dir + extended_prefix + "_polymorphicARRAY.sh"
 with open(polymorphic_script, 'w') as plm:
 	plm.write("#!/bin/bash\n\n")
 	plm.write("#SBATCH --cpus-per-task=10\n")
 	plm.write("#SBATCH --time=0-20:00:00\n")
-	plm.write("#SBATCH --job-name=plm_" + prefix + "\n")
+	plm.write("#SBATCH --job-name=plm\n")
 	plm.write("#SBATCH --output=" + jobsout_dir + extended_prefix + "_polymorphic_%A-%a.out\n")
 	plm.write("#SBATCH --error=" + jobsout_dir + extended_prefix + "_polymorphic_%A-%a.err\n")
 	plm.write("#SBATCH --mail-type=FAIL\n")
@@ -150,25 +157,28 @@ with open(polymorphic_script, 'w') as plm:
 	if args.minInd is not None:
 		plm.write(" -minInd " + args.minInd)
 
-#Update checkpoint file with the data file names
-polymorphic_gls_files = []
+#record filenames to add to ckpt file (global ones may go unused)
+polymorphic_beagle_files = []
 polymorphic_maf_files = []
-polymorphic_depths_files = []
-polymorphic_counts_files = []
+
+global_beagle_files = []
+global_maf_files = []
 
 for chrom in chrs_list:
-	polymorphic_gls_file = gls_dir + extended_prefix + "_" + chrom + "_polymorphic.beagle.gz"
-	polymorphic_gls_files.append(polymorphic_gls_file)
+	polymorphic_beagle_file = gls_dir + extended_prefix + "_" + chrom + "_polymorphic.beagle.gz"
+	polymorphic_beagle_files.append(polymorphic_beagle_file)
 	polymorphic_maf_file = gls_dir + extended_prefix + "_" + chrom + "_polymorphic.mafs.gz"
 	polymorphic_maf_files.append(polymorphic_maf_file)
 
+#IF USER SPECIFIED GLOBAL
 if args.global_gls == True:
+	#angsd array acript - global
 	global_script = scripts_dir + extended_prefix + "_globalARRAY.sh"
 	with open(global_script, 'w') as glb:
 		glb.write("#!/bin/bash\n\n")
 		glb.write("#SBATCH --cpus-per-task=10\n")
 		glb.write("#SBATCH --time=0-20:00:00\n")
-		glb.write("#SBATCH --job-name=global_" + prefix + "\n")
+		glb.write("#SBATCH --job-name=glob\n")
 		glb.write("#SBATCH --output=" + jobsout_dir + extended_prefix + "_global_%A-%a.out\n")
 		glb.write("#SBATCH --error=" + jobsout_dir + extended_prefix + "_global_%A-%a.err\n")
 		glb.write("#SBATCH --mail-type=FAIL\n")
@@ -213,21 +223,112 @@ if args.global_gls == True:
 		if args.minInd is not None:
 			glb.write(" -minInd " + args.minInd)
 
-	global_gls_files = []
-	global_maf_files = []
-	global_depths_files = []
-	global_counts_files = []
-
+	#record global filenames in lists initialized previously
 	for chrom in chrs_list:
-		global_gls_file = gls_dir + extended_prefix + "_" + chrom + "_global.beagle.gz"
-		global_gls_files.append(global_gls_file)
+		global_beagle_file = gls_dir + extended_prefix + "_" + chrom + "_global.beagle.gz"
+		global_beagle_files.append(global_beagle_file)
 		global_maf_file = gls_dir + extended_prefix + "_" + chrom + "_global.mafs.gz"
 		global_maf_files.append(global_maf_file)
+
+#write scripts to concatenate data from individual chromsomes
+#polymorphic beagle
+all_chrs_polymorphic_beagle = gls_dir + extended_prefix + "_wholegenome-polymorphic.beagle"
+polymorphic_beagle_concat_script = scripts_dir + extended_prefix + "_concatenate_polymorphic_beagles.sh"
+with open(polymorphic_beagle_concat_script, 'w') as bcp:
+	bcp.write("#!/bin/bash\n\n")
+	bcp.write("#SBATCH --cpus-per-task=5\n")
+	bcp.write("#SBATCH --job-name=cat-p-beagles\n")
+	bcp.write("#SBATCH --mail-type=FAIL\n")
+	bcp.write("#SBATCH --mail-user=" + email + "\n")
+	bcp.write("#SBATCH --output=" + jobsout_dir + extended_prefix + "_concatenate-polymorphic-beagles_%A.out\n")
+	bcp.write("#SBATCH --error=" + jobsout_dir + extended_prefix + "_concatenate-polymorphic-beagles_%A.err\n\n")
+	bcp.write("zcat " + polymorphic_beagle_files[0] + " " + \
+		"| head -n 1 > " + \
+		all_chrs_polymorphic_beagle + "; " + \
+		"for i in " + " ".join(polymorphic_beagle_files) + "; " + \
+		"do zcat $i " + \
+		"| tail -n +2 -q >> " + \
+		all_chrs_polymorphic_beagle + "; " + \
+		"done\n")
+	bcp.write("gzip " + all_chrs_polymorphic_beagle)
+
+#polymorphic mafs/sites
+all_chrs_polymorphic_maf = gls_dir + extended_prefix + "_wholegenome-polymorphic.mafs"
+all_chrs_polymorphic_sites = gls_dir + extended_prefix + "_wholegenome-polymorphic.sites"
+polymorphic_mafs_concat_script = scripts_dir + extended_prefix + "_concatenate_polymorphic_mafs.sh"
+with open(polymorphic_mafs_concat_script, 'w') as mcp:
+	mcp.write("#!/bin/bash\n\n")
+	mcp.write("#SBATCH --cpus-per-task=5\n")
+	mcp.write("#SBATCH --job-name=cat-p-mafs\n")
+	mcp.write("#SBATCH --mail-type=FAIL\n")
+	mcp.write("#SBATCH --mail-user=" + email + "\n")
+	mcp.write("#SBATCH --output=" + jobsout_dir + extended_prefix + "_concatenate-polymorphic-mafs_%A.out\n")
+	mcp.write("#SBATCH --error=" + jobsout_dir + extended_prefix + "_concatenate-polymorphic-mafs_%A.err\n\n")
+	mcp.write("module unload bio/angsd/0.933\n")
+	mcp.write("module load bio/angsd/0.933\n\n")
+
+	#in the event that a mafs file already exists, the following line will empty it (if the file doesn't exist, this line will initialize the file with nothing inside it)
+	mcp.write("""echo -n "" > """ + all_chrs_polymorphic_maf + "\n")
+	mcp.write("for i in " + " ".join(polymorphic_maf_files) + "\n" + \
+		"do zcat $i | tail -n +2 -q >> " + \
+		all_chrs_polymorphic_maf + "; " + \
+		"done\n")
+	mcp.write("cut -f 1,2,3,4 " + all_chrs_polymorphic_maf + " > " + all_chrs_polymorphic_sites + "\n")
+	mcp.write("gzip " + all_chrs_polymorphic_maf + "\n\n")
+	mcp.write("angsd sites index " + all_chrs_polymorphic_sites + "\n")
+
+#concatenate global files, if they exist
+if args.global_gls == True:
+	#global beagle
+	all_chrs_global_beagle = gls_dir + extended_prefix + "_wholegenome.beagle"
+	global_beagle_concat_script = scripts_dir + extended_prefix + "_concatenate_global_beagles.sh"
+	with open(global_beagle_concat_script, 'w') as bcg:
+		bcg.write("#!/bin/bash\n\n")
+		bcg.write("#SBATCH --cpus-per-task=5\n")
+		bcg.write("#SBATCH --job-name=cat-g-beagles\n")
+		bcg.write("#SBATCH --mail-type=FAIL\n")
+		bcg.write("#SBATCH --mail-user=" + email + "\n")
+		bcg.write("#SBATCH --output=" + jobsout_dir + extended_prefix + "_concatenate-global-beagles_%A.out\n")
+		bcg.write("#SBATCH --error=" + jobsout_dir + extended_prefix + "_concatenate-global-beagles_%A.err\n\n")
+		bcg.write("zcat " + global_beagle_files[0] + " " + \
+			"| head -n 1 > " + \
+			all_chrs_global_beagle + "; " + \
+			"for i in " + " ".join(global_beagle_files) + "; " + \
+			"do zcat $i " + \
+			"| tail -n +2 -q >> " + \
+			all_chrs_global_beagle + "; " + \
+			"done\n")
+		bcg.write("gzip " + all_chrs_global_beagle)
+	
+	#global mafs/sites
+	all_chrs_global_maf = gls_dir + extended_prefix + "_wholegenome.mafs"
+	all_chrs_global_sites = gls_dir + extended_prefix + "_wholegenome.sites"
+	global_mafs_concat_script = scripts_dir + extended_prefix + "_concatenate_global_mafs.sh"
+	with open(global_mafs_concat_script, 'w') as mcg:
+		mcg.write("#!/bin/bash\n\n")
+		mcg.write("#SBATCH --cpus-per-task=5\n")
+		mcg.write("#SBATCH --job-name=cat-g-mafs\n")
+		mcg.write("#SBATCH --mail-type=FAIL\n")
+		mcg.write("#SBATCH --mail-user=" + email + "\n")
+		mcg.write("#SBATCH --output=" + jobsout_dir + extended_prefix + "_concatenate-global-mafs_%A.out\n")
+		mcg.write("#SBATCH --error=" + jobsout_dir + extended_prefix + "_concatenate-global-mafs_%A.err\n\n")
+		mcg.write("module unload bio/angsd/0.933\n")
+		mcg.write("module load bio/angsd/0.933\n\n")
+
+		#in the event that a mafs file already exists, the following line will empty it (if the file doesn't exist, this line will initialize the file with nothing inside it)
+		mcg.write("""echo -n "" > """ + all_chrs_global_maf + "\n")
+		mcg.write("for i in " + " ".join(global_maf_files) + "\n" + \
+			"do zcat $i | tail -n +2 -q >> " + \
+			all_chrs_global_maf + "; " + \
+			"done\n")
+		mcg.write("cut -f 1,2,3,4 " + all_chrs_global_maf + " > " + all_chrs_global_sites + "\n")
+		mcg.write("gzip " + all_chrs_global_maf + "\n\n")
+		mcg.write("angsd sites index " + all_chrs_global_sites + "\n")
 
 with open(writeout_ckpt_filename, 'a') as ckpt:
 	ckpt.write("usePREFIX\t" + extended_prefix + "\n")
 	ckpt.write("glsDIR\t" + gls_dir + "\n")
-	ckpt.write("blackLIST\t" + args.blacklist_inds + "\n")
+	ckpt.write("excludeLIST\t" + args.exclude_inds + "\n")
 	ckpt.write("nIND-filtered\t" + str(n_ind) + "\n")
 	ckpt.write("bamsLIST-filtered\t" + filtered_bamslist_filename + "\n")
 	ckpt.write("depthMIN-factor\t" + str(args.minDepth_factor) + "\n")
@@ -235,32 +336,40 @@ with open(writeout_ckpt_filename, 'a') as ckpt:
 	ckpt.write("minQ\t" + args.quality_val + "\n")
 	if args.minInd is not None:
 		ckpt.write("minIND\t" + args.minInd + "\n")
-	ckpt.write("glsFILES-polymorphic\t" + ",".join(polymorphic_gls_files) + "\n")
+	ckpt.write("glsFILES-polymorphic\t" + ",".join(polymorphic_beagle_files) + "\n")
 	ckpt.write("mafsFILES-polymorphic\t" + ",".join(polymorphic_maf_files) + "\n")
+	ckpt.write("wholegenomeBEAGLE-polymorphic\t" + all_chrs_polymorphic_beagle + ".gz\n")
+	ckpt.write("wholegenomeMAF-polymorphic\t" + all_chrs_polymorphic_maf + ".gz\n")
+	ckpt.write("wholegenomeSITES-polymorphic\t" + all_chrs_polymorphic_sites + "\n")
 	if args.global_gls == True:
-		ckpt.write("glsFILES-global\t" + ",".join(global_gls_files) + "\n")
+		ckpt.write("glsFILES-global\t" + ",".join(global_beagle_files) + "\n")
 		ckpt.write("mafsFILES-global\t" + ",".join(global_maf_files) + "\n")
+		ckpt.write("wholegenomeBEAGLE-global\t" + all_chrs_global_beagle + ".gz\n")
+		ckpt.write("wholegenomeMAF-global\t" + all_chrs_global_maf + ".gz\n")
+		ckpt.write("wholegenomeSITES-global\t" + all_chrs_global_sites + "\n")
 
 print("Step 4 has finished successfully!")
-if args.global_gls == True:
-	print("You will find two new scripts in ./scripts/:\n" + \
-		global_script + " calculates genotype likelihoods across all sites on each chromosome (separately).")
-else:
-	print("You will find a new script in ./scripts/:")
 print(polymorphic_script + " calculates genotype likelihoods across all polymorphic sites on each chromosome (separately).")
-print("Both scripts can run simultaneously.")
+print("After this has run, you will have genotype likelihoods (gls) and allele frequencies (maf) for " + \
+		"all putatively variable sites (SNPs).")
+print(polymorphic_beagle_concat_script + "concatenates beagles from all SNPs across all chromosomes.")
+print(polymorphic_mafs_concat_script + "concatenates mafs from all SNPs across all chromosomes, generating and indexing a sites file for the whole genome.")
+print(polymorphic_script + " must have finished prior to running concatenation, but concatenation scripts can run in parallel.")
 if args.global_gls == True:
+	print(global_script + " calculates genotype likelihoods across all sites on each chromosome (separately).")
+	print("Both " + polymorphic_script + " and " + global_script + " can run simultaneously.")
 	print("After they have run, you will have genotype likelihoods (gls) and allele frequencies (maf) for " + \
 		"all sites in the genome (global) and putatively variable sites (polymorphic).")
-else:
-	print("After they have run, you will have genotype likelihoods (gls) and allele frequencies (maf) for " + \
-		"all putatively variable sites (SNPs).")
+	print(global_beagle_concat_script + "concatenates beagles from all positions across all chromosomes.")
+	print(global_mafs_concat_script + "concatenates mafs from all positions across all chromosomes, generating and indexing a sites file for the whole genome.")
+	print(global_script + " must have finished prior to running concatenation, but concatenation scripts can run in parallel.")
 if args.prefix_extension is not None:
 	print("You have specified a prefix extension. To facilitate downstream branching, a new checkpoint file has been written:")
-	print(writeout_ckpt_filename + " contains all the information from " + args.ckpt_file)
+	print("\t" + writeout_ckpt_filename + " contains all the information from " + args.ckpt_file)
 print("Additionally, the parameterization used for calculating genotype likelihoods in ANGSD has been recorded in " +\
 	writeout_ckpt_filename + ". Including:")
+print("\tminDepth " + str(args.minDepth_factor))
+print("\tmaxDepth " + str(args.maxDepth_factor))
+print("\tminQ " + args.quality_val)
 if args.minInd is not None:
-	print("the minDepth factor, maxDepth factor, minQ, and minInd")
-else:
-	print("the minDepth factor, maxDepth factor, and minQ")
+	print("\tminInd " + args.minInd)
