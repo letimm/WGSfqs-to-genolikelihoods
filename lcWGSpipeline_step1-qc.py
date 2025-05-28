@@ -6,6 +6,7 @@ import os
 #Read in checkpoint file from step 0:
 parser = argparse.ArgumentParser()
 parser.add_argument('--ckpt_file', '-p', help = 'Please provide the checkpoint file from step 0.')
+parser.add_argument('--multiQC_env', '-m', help = 'Provide the path to the python env containing multiQC. If the environment is named "hydraQC", it will look like "/home/ltimm/bin/hydraQC".')
 args = parser.parse_args()
 
 #Initialize run config variables with some default values
@@ -90,11 +91,12 @@ with open(mQC_script, 'w') as ms:
 	ms.write("#SBATCH --output=" + jobsout_dir + prefix + "-raw_multiQC.out\n")
 	ms.write("#SBATCH --error=" + jobsout_dir + prefix + "-raw_multiQC.err\n")
 	
-	ms.write("mamba activate multiqc-1.17\n")
+	ms.write("source " + args.multiQC_env + "/bin/activate\n")
 	ms.write("multiqc " + fastqc_dir)
 
 with open(args.ckpt_file, 'a') as ckpt:
 	ckpt.write("fastqc-rawDIR\t" + fastqc_dir + "\n")
+	ckpt.write("multiqcENV\t" + args.multiQC_env + "\n")
 
 print("Step 1 has finished successfully! You will find two new scripts in ./scripts/: " + \
 	array_script + " and " + mQC_script + ".")
