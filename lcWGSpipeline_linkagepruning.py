@@ -7,7 +7,7 @@ from collections import OrderedDict
 #Read in config file for the run
 parser = argparse.ArgumentParser()
 parser.add_argument('--ckpt_file', '-p', help = 'Please provide the checkpoint file created in step 0.')
-parser.add_argument('--thinning_factor', '-t', type = float, help = 'Factor by which to thin the beagle file; that is, 1 of every t lines should be kept.', required = False)
+parser.add_argument('--thinning_factor', '-t', type = str, help = 'Factor by which to thin the beagle file; that is, 1 of every t lines should be kept.', required = False)
 args = parser.parse_args()
 
 #Initialize run config variables with some default values
