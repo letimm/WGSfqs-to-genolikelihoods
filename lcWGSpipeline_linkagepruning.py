@@ -116,7 +116,7 @@ with open(ld_script, 'w') as s:
 		"| cut -f 4- " + \
 		"| gzip > ${base_filename}.beagle.gz\n\n")
 	
-	s.write("rm ${base_filename}.tmp.beagle.gz")
+	s.write("rm ${base_filename}.tmp.beagle.gz\n\n")
 	
 	s.write('num_lines=$(< "${base_filename}.beagle.gz" zcat | wc -l)\n\n')
 
