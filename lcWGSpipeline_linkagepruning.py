@@ -94,36 +94,38 @@ with open(ld_script, 'w') as s:
 		s.write("base_filename=${base_filename%.beagle.gz}_ngsLD-" + args.thinning_factor + "\n\n")
 		#remove the first line and apply the thinning factor to the beagle file
 		s.write("zcat ${beagle_file} | sed '1d' | awk 'NR % " + args.thinning_factor + " == 0' | gzip > " + \
-		  "${base_filename}.beagle.gz\n\n")
+		  "${base_filename}.tmp.beagle.gz\n\n")
 		
 		#get the associated pos file
-		s.write("zcat ${base_filename}.beagle.gz | awk '{print $1}' | " + \
-		  "sed -i 's/.1_/.1\t/g' > " + \
+		s.write("zcat ${base_filename}.tmp.beagle.gz | awk '{print $1}' | " + \
+		  "sed 's/.1_/.1\t/g' > " + \
 		  "${base_filename}.pos\n\n")
 		
 	else:
 		s.write("base_filename=${base_filename%.beagle.gz}_ngsLD\n\n")
 		#remove the first line of the beagle file
 		s.write("zcat ${beagle_file} | sed '1d' | gzip > " + \
-		  "${base_filename}.beagle.gz\n\n")
+		  "${base_filename}.tmp.beagle.gz\n\n")
 		
 		#get the associated pos file
-		s.write("zcat $base_filename}.beagle.gz | awk '{print $1}' | " + \
-		  "sed -i 's/.1_/.1\t/g' > " + \
+		s.write("zcat ${base_filename}.tmp.beagle.gz | awk '{print $1}' | " + \
+		  "sed 's/.1_/.1\t/g' > " + \
 		  "${base_filename}.pos\n\n")
 
-	s.write("zcat ${base_filename}.beagle.gz " + \
+	s.write("zcat ${base_filename}.tmp.beagle.gz " + \
 		"| cut -f 4- " + \
 		"| gzip > ${base_filename}.beagle.gz\n\n")
 	
-	s.write('num_of_lines=$(< "${base_filename}.beagle.gz" zcat | wc -l)\n\n')
+	s.write("rm ${base_filename}.tmp.beagle.gz")
+	
+	s.write('num_lines=$(< "${base_filename}.beagle.gz" zcat | wc -l)\n\n')
 
 	s.write("ngsLD " + \
 		"--geno ${base_filename}.beagle.gz " + \
 		"--pos ${base_filename}.pos " + \
 		"--probs " + \
 		"--n_ind " + filtered_n + " " + \
-		"--n_sites ${num_of_lines} " + \
+		"--n_sites ${num_lines} " + \
 		"--max_kb_dist 0 " + \
 		"--n_threads 10 " + \
 		"--out ${base_filename}.ld\n\n")
