@@ -130,11 +130,11 @@ with open(ld_script, 'w') as s:
 		"--n_threads 10 " + \
 		"--out ${base_filename}.ld\n\n")
 	
-	s.write("prune_graph.pl " + \
-		"--in_file ${base_filename}.ld " + \
-		"--max_kb_dist 2 " + \
-		"--min_weight 0.5 " + \
-		"--out ${base_filename}-unlinked.id\n\n")
+#	s.write("prune_graph.pl " + \
+#		"--in_file ${base_filename}.ld " + \
+#		"--max_kb_dist 2 " + \
+#		"--min_weight 0.5 " + \
+#		"--out ${base_filename}-unlinked.id\n\n")
 
 #Take the list of unlinked sites into ANGSD
 #(not worried about doing a lot of filtering here because the beagle/maf that went in already represented filtered sites)
